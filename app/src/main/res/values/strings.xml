@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Paper Trader</string>
+    <string name="disclaimer">Simulation only. No real funds, exchanges, or wallets are involved.</string>
+</resources>

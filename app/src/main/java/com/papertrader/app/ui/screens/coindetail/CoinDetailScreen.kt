@@ -23,12 +23,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.papertrader.app.ui.components.CoinLogo
 import com.papertrader.app.ui.components.PriceLineChart
+import com.papertrader.app.ui.components.TradingViewChart
 import com.papertrader.app.ui.components.formatPercent
 import com.papertrader.app.ui.components.formatUsd
 import com.papertrader.app.ui.components.formatUsdCompact
@@ -48,6 +52,7 @@ fun CoinDetailScreen(
     val viewModel: CoinDetailViewModel = viewModel(factory = factory)
     LaunchedEffect(coinId) { viewModel.load(coinId) }
     val state by viewModel.uiState.collectAsState()
+    var useTradingView by remember { mutableStateOf(true) }
 
     if (state.isLoading || state.coin == null) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
@@ -83,20 +88,35 @@ fun CoinDetailScreen(
         )
 
         Spacer(Modifier.height(20.dp))
-        PriceLineChart(values = state.chartValues, isPositive = positive)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ChartModeChip("TradingView Live", useTradingView) { useTradingView = true }
+            ChartModeChip("Simple", !useTradingView) { useTradingView = false }
+        }
+        Spacer(Modifier.height(12.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            CoinChartPeriod.values().forEach { period ->
-                val selected = period == state.selectedPeriod
-                Text(
-                    text = period.label,
-                    color = if (selected) MaterialTheme.colorScheme.primary else TextSecondary,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                    modifier = Modifier.clickable { viewModel.selectPeriod(period) }
-                )
+        if (useTradingView) {
+            TradingViewChart(
+                coinSymbol = coin.symbol,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(460.dp)
+            )
+        } else {
+            PriceLineChart(values = state.chartValues, isPositive = positive)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                CoinChartPeriod.values().forEach { period ->
+                    val selected = period == state.selectedPeriod
+                    Text(
+                        text = period.label,
+                        color = if (selected) MaterialTheme.colorScheme.primary else TextSecondary,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.clickable { viewModel.selectPeriod(period) }
+                    )
+                }
             }
         }
 
@@ -143,4 +163,20 @@ private fun StatRow(label: String, value: String) {
         Text(label, color = TextSecondary)
         Text(value)
     }
+}
+
+@Composable
+private fun ChartModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary else SurfaceCard,
+                RoundedCornerShape(50)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }

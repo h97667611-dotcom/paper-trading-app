@@ -6,8 +6,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
 private val DarkColors = darkColorScheme(
-    primary = AccentViolet,
-    onPrimary = TextPrimary,
+    primary = AccentWhite,
+    onPrimary = BackgroundBlack,
     background = BackgroundBlack,
     onBackground = TextPrimary,
     surface = SurfaceCard,

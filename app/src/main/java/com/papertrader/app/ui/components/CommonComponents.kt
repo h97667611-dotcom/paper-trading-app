@@ -22,7 +22,6 @@ import coil.compose.AsyncImage
 import com.papertrader.app.domain.model.Coin
 import com.papertrader.app.ui.theme.LossRed
 import com.papertrader.app.ui.theme.ProfitGreen
-import com.papertrader.app.ui.theme.SurfaceCard
 import com.papertrader.app.ui.theme.TextSecondary
 import java.text.NumberFormat
 import java.util.Locale
@@ -69,9 +68,8 @@ fun CoinCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceCard)
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(vertical = 10.dp, horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

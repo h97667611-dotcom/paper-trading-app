@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background_black">#0B0B0D</color>
-    <color name="surface_card">#1B1C20</color>
+    <color name="background_black">#000000</color>
+    <color name="surface_card">#141414</color>
     <color name="profit_green">#2ECC71</color>
     <color name="loss_red">#FF5C5C</color>
-    <color name="text_primary">#F5F5F7</color>
-    <color name="text_secondary">#9A9AA2</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8E8E93</color>
 </resources>

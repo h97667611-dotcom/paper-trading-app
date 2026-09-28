@@ -1,5 +1,6 @@
 package com.papertrader.app.ui.screens.markets
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.papertrader.app.domain.model.DexPair
@@ -58,15 +60,17 @@ fun MarketsScreen(factory: ViewModelFactory, onCoinClick: (String) -> Unit) {
                     .fillMaxWidth()
                     .padding(top = 12.dp)
             )
-            Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 MarketsTab.values().forEach { tab ->
                     val selected = tab == state.selectedTab
                     Text(
                         text = if (tab == MarketsTab.COINS) "Crypto" else "DEX Pairs",
-                        color = if (selected) MaterialTheme.colorScheme.primary else TextSecondary,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                            .then(Modifier)
+                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (selected) MaterialTheme.colorScheme.primary else SurfaceCard)
                             .clickableTab { viewModel.selectTab(tab) }
+                            .padding(horizontal = 18.dp, vertical = 10.dp)
                     )
                 }
             }

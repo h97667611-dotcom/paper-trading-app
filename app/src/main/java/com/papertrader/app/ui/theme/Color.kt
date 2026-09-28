@@ -2,15 +2,17 @@ package com.papertrader.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Dark FinTech palette, matching the reference screenshots' near-black
-// background, slightly-lighter cards, muted green/red for P&L, and a
-// purple/violet accent for primary interactive elements.
-val BackgroundBlack = Color(0xFF0B0B0D)
-val SurfaceCard = Color(0xFF1B1C20)
-val SurfaceCardElevated = Color(0xFF232429)
+// Pure black theme inspired by the Phantom wallet UI: true-black background,
+// neutral dark-gray cards, white as the only accent (no purple/violet).
+val BackgroundBlack = Color(0xFF000000)
+val SurfaceCard = Color(0xFF141414)
+val SurfaceCardElevated = Color(0xFF1E1E1E)
 val ProfitGreen = Color(0xFF2ECC71)
 val LossRed = Color(0xFFFF5C5C)
-val AccentViolet = Color(0xFF8C7BFA)
-val TextPrimary = Color(0xFFF5F5F7)
-val TextSecondary = Color(0xFF9A9AA2)
-val Divider = Color(0xFF2A2B30)
+val AccentWhite = Color(0xFFFFFFFF)
+val TextPrimary = Color(0xFFFFFFFF)
+val TextSecondary = Color(0xFF8E8E93)
+val Divider = Color(0xFF262626)
+
+// Kept as an alias so existing references keep compiling; it is white now.
+val AccentViolet = AccentWhite

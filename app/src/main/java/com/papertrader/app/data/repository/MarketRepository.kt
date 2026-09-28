@@ -35,6 +35,21 @@ class MarketRepository(
     private val chartCache = ConcurrentHashMap<String, CacheEntry<List<PricePoint>>>()
     private val dexCache = ConcurrentHashMap<String, CacheEntry<List<DexPair>>>()
 
+    /** Last known top-coins list regardless of age (for instant first paint), or null. */
+    fun peekTopCoins(perPage: Int = 100): List<Coin>? = marketsCache["top_$perPage"]?.value
+
+    /** Last known data for one coin from the top list regardless of age, or null. */
+    fun peekCoin(coinId: String): Coin? =
+        marketsCache["top_100"]?.value?.firstOrNull { it.id == coinId }
+
+    private fun freshCoinsFromTopCache(ids: List<String>): List<Coin>? {
+        val entry = marketsCache["top_100"] ?: return null
+        if (System.currentTimeMillis() - entry.timestampMillis >= CACHE_TTL_MILLIS) return null
+        val byId = entry.value.associateBy { it.id }
+        val found = ids.mapNotNull { byId[it] }
+        return if (found.size == ids.size) found else null
+    }
+
     suspend fun getTopCoins(perPage: Int = 100): NetworkResult<List<Coin>> {
         val cacheKey = "top_$perPage"
         return withRetryAndCache(
@@ -48,6 +63,7 @@ class MarketRepository(
 
     suspend fun getCoinsByIds(ids: List<String>): NetworkResult<List<Coin>> {
         if (ids.isEmpty()) return NetworkResult.Success(emptyList())
+        freshCoinsFromTopCache(ids)?.let { return NetworkResult.Success(it) }
         val cacheKey = "ids_${ids.sorted().joinToString(",")}"
         return withRetryAndCache(
             cache = marketsCache,

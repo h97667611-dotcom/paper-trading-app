@@ -37,11 +37,14 @@ class CoinDetailViewModel(private val marketRepository: MarketRepository) : View
     fun load(coinId: String) {
         if (currentCoinId == coinId && _uiState.value.coin != null) return
         currentCoinId = coinId
+        marketRepository.peekCoin(coinId)?.let { cached ->
+            _uiState.value = _uiState.value.copy(isLoading = false, coin = cached)
+        }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(isLoading = _uiState.value.coin == null, errorMessage = null)
             when (val result = marketRepository.getCoinsByIds(listOf(coinId))) {
                 is NetworkResult.Success -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false, coin = result.data.firstOrNull())
+                    _uiState.value = _uiState.value.copy(isLoading = false, coin = result.data.firstOrNull() ?: _uiState.value.coin)
                     loadChart(coinId, _uiState.value.selectedPeriod)
                 }
                 is NetworkResult.Error -> _uiState.value =

@@ -36,6 +36,7 @@ class MarketsViewModel(private val marketRepository: MarketRepository) : ViewMod
     private var searchJob: Job? = null
 
     init {
+        marketRepository.peekTopCoins()?.let { applyCoins(it, fromCache = true) }
         loadMarkets()
         loadDexPairs()
     }
@@ -65,23 +66,24 @@ class MarketsViewModel(private val marketRepository: MarketRepository) : ViewMod
         }
     }
 
+    private fun applyCoins(coins: List<Coin>, fromCache: Boolean) {
+        val sortedByChange = coins.sortedByDescending { it.priceChangePercent24h }
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            allCoins = coins,
+            trending = sortedByChange.take(10),
+            topGainers = sortedByChange.filter { it.priceChangePercent24h > 0 }.take(10),
+            topLosers = sortedByChange.filter { it.priceChangePercent24h < 0 }.takeLast(10).reversed(),
+            isFromCache = fromCache,
+            errorMessage = null
+        )
+    }
+
     private fun loadMarkets() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = _uiState.value.allCoins.isEmpty())
             when (val result = marketRepository.getTopCoins(perPage = 100)) {
-                is NetworkResult.Success -> {
-                    val coins = result.data
-                    val sortedByChange = coins.sortedByDescending { it.priceChangePercent24h }
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        allCoins = coins,
-                        trending = sortedByChange.take(10),
-                        topGainers = sortedByChange.filter { it.priceChangePercent24h > 0 }.take(10),
-                        topLosers = sortedByChange.filter { it.priceChangePercent24h < 0 }.takeLast(10).reversed(),
-                        isFromCache = result.isFromCache,
-                        errorMessage = null
-                    )
-                }
+                is NetworkResult.Success -> applyCoins(result.data, result.isFromCache)
                 is NetworkResult.Error -> _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     errorMessage = result.message

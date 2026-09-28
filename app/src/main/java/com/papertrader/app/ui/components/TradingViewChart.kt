@@ -36,6 +36,7 @@ fun TradingViewChart(
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
                 setBackgroundColor(android.graphics.Color.BLACK)
+                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                 webViewClient = WebViewClient()
                 // Let the chart handle pan/zoom gestures instead of the parent scroll view.
                 setOnTouchListener { v, _ ->

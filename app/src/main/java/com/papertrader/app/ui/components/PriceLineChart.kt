@@ -33,7 +33,7 @@ fun PriceLineChart(
     var progress by remember(values) { mutableFloatStateOf(0f) }
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = tween(durationMillis = 700),
+        animationSpec = tween(durationMillis = 400),
         label = "chartProgress"
     )
     LaunchedEffect(values) { progress = 1f }

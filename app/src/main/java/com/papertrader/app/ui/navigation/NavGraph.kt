@@ -1,5 +1,8 @@
 package com.papertrader.app.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -36,7 +39,11 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
         NavHost(
             navController = navController,
             startDestination = Screen.Dashboard.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = { fadeIn(tween(150)) },
+            exitTransition = { fadeOut(tween(100)) },
+            popEnterTransition = { fadeIn(tween(150)) },
+            popExitTransition = { fadeOut(tween(100)) }
         ) {
             composable(Screen.Dashboard.route) {
                 DashboardScreen(factory)

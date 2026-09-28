@@ -63,6 +63,19 @@ class DashboardViewModel(
     }
 
     private suspend fun refreshPricesAndCompute(cash: Double, positions: List<Position>) {
+        if (_uiState.value.isLoading) {
+            // First paint right away from local data; live prices refine it below.
+            val quickInvested = positions.sumOf { it.avgEntryPrice * it.quantity }
+            val quickTotal = cash + quickInvested
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                cashBalance = cash,
+                investedValue = quickInvested,
+                totalValue = quickTotal,
+                totalPnl = quickTotal - startingCapital,
+                totalPnlPercent = if (startingCapital > 0) (quickTotal - startingCapital) / startingCapital * 100.0 else 0.0
+            )
+        }
         val ids = positions.map { it.coinId }
         val priceById: Map<String, Double> = if (ids.isEmpty()) {
             emptyMap()

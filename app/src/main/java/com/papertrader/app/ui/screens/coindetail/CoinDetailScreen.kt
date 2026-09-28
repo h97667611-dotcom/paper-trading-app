@@ -3,6 +3,7 @@ package com.papertrader.app.ui.screens.coindetail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,6 +42,7 @@ import com.papertrader.app.ui.theme.ProfitGreen
 import com.papertrader.app.ui.theme.SurfaceCard
 import com.papertrader.app.ui.theme.TextSecondary
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
+import kotlinx.coroutines.delay
 
 @Composable
 fun CoinDetailScreen(
@@ -53,6 +55,11 @@ fun CoinDetailScreen(
     LaunchedEffect(coinId) { viewModel.load(coinId) }
     val state by viewModel.uiState.collectAsState()
     var useTradingView by remember { mutableStateOf(true) }
+    var chartReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(300) // let the screen transition finish before creating the WebView
+        chartReady = true
+    }
 
     if (state.isLoading || state.coin == null) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
@@ -95,12 +102,21 @@ fun CoinDetailScreen(
         Spacer(Modifier.height(12.dp))
 
         if (useTradingView) {
-            TradingViewChart(
-                coinSymbol = coin.symbol,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(460.dp)
-            )
+            if (chartReady) {
+                TradingViewChart(
+                    coinSymbol = coin.symbol,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(460.dp)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(460.dp),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
+                ) { CircularProgressIndicator() }
+            }
         } else {
             PriceLineChart(values = state.chartValues, isPositive = positive)
 

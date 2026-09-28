@@ -81,7 +81,7 @@ fun MarketsScreen(factory: ViewModelFactory, onCoinClick: (String) -> Unit) {
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(state.searchResults) { coin ->
+                items(state.searchResults, key = { it.id }) { coin ->
                     CoinCard(coin = coin, onClick = { onCoinClick(coin.id) })
                 }
             }
@@ -103,7 +103,7 @@ private fun CoinsTabContent(state: MarketsUiState, onCoinClick: (String) -> Unit
         item {
             SectionHeader("Trending")
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.trending) { coin ->
+                items(state.trending, key = { it.id }) { coin ->
                     MiniCoinChip(name = coin.symbol, price = formatUsd(coin.currentPrice), change = formatPercent(coin.priceChangePercent24h), positive = coin.priceChangePercent24h >= 0) {
                         onCoinClick(coin.id)
                     }
@@ -111,11 +111,11 @@ private fun CoinsTabContent(state: MarketsUiState, onCoinClick: (String) -> Unit
             }
         }
         item { SectionHeader("Top Gainers") }
-        items(state.topGainers) { coin -> CoinCard(coin = coin, onClick = { onCoinClick(coin.id) }) }
+        items(state.topGainers, key = { "g_${it.id}" }) { coin -> CoinCard(coin = coin, onClick = { onCoinClick(coin.id) }) }
         item { SectionHeader("Top Losers") }
-        items(state.topLosers) { coin -> CoinCard(coin = coin, onClick = { onCoinClick(coin.id) }) }
+        items(state.topLosers, key = { "l_${it.id}" }) { coin -> CoinCard(coin = coin, onClick = { onCoinClick(coin.id) }) }
         item { SectionHeader("Popular Coins") }
-        items(state.allCoins) { coin -> CoinCard(coin = coin, onClick = { onCoinClick(coin.id) }) }
+        items(state.allCoins, key = { "a_${it.id}" }) { coin -> CoinCard(coin = coin, onClick = { onCoinClick(coin.id) }) }
     }
 }
 

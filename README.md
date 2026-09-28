@@ -1,4 +1,4 @@
-# Paper Trader 📈
+# Ghosttrade 📈
 
 A modern, dark-themed **Android paper-trading app for crypto**, built with
 Kotlin and Jetpack Compose. It feels like a real trading platform, but every
@@ -384,7 +384,7 @@ Released under the [MIT License](LICENSE).
 
 ## Disclaimer
 
-**Paper Trader is a simulation only.** It does not buy or sell real
+**Ghosttrade is a simulation only.** It does not buy or sell real
 cryptocurrency, does not place real exchange orders, does not touch any
 real wallet, and does not process real deposits or withdrawals. All funds,
 trades, gains, and losses shown in the app are entirely virtual and for

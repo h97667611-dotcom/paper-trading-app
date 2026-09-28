@@ -60,7 +60,7 @@ fun ProfileScreen(
         SettingsRow("API Settings", "CoinGecko & DexScreener endpoints"),
         SettingsRow("Data Sources", "CoinGecko (market data) · DexScreener (DEX pairs)"),
         SettingsRow("Reset Paper Account", "Erase portfolio & trade history", viewModel::requestReset),
-        SettingsRow("About", "Paper Trader v${BuildConfig.VERSION_NAME}")
+        SettingsRow("About", "Ghosttrade v${BuildConfig.VERSION_NAME}")
     )
 
     Column(modifier = Modifier.fillMaxSize()) {

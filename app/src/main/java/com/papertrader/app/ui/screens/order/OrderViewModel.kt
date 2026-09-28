@@ -94,7 +94,8 @@ class OrderViewModel(
             _uiState.value = state.copy(errorMessage = "Enter a quantity greater than zero.")
             return
         }
-        if (state.orderType == OrderType.LIMIT && (state.limitPrice == null || state.limitPrice <= 0.0)) {
+        val enteredLimit = state.limitPrice
+        if (state.orderType == OrderType.LIMIT && (enteredLimit == null || enteredLimit <= 0.0)) {
             _uiState.value = state.copy(errorMessage = "Enter a valid limit price.")
             return
         }

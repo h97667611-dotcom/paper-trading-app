@@ -1,5 +1,6 @@
 package com.papertrader.app.ui.screens.markets
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -92,7 +93,7 @@ fun MarketsScreen(factory: ViewModelFactory, onCoinClick: (String) -> Unit) {
 @Composable
 private fun CoinsTabContent(state: MarketsUiState, onCoinClick: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 20.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
@@ -117,7 +118,7 @@ private fun CoinsTabContent(state: MarketsUiState, onCoinClick: (String) -> Unit
 @Composable
 private fun DexPairsTabContent(pairs: List<DexPair>) {
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(pairs) { pair ->
@@ -163,4 +164,4 @@ private fun MiniCoinChip(name: String, price: String, change: String, positive: 
 }
 
 private fun Modifier.clickableTab(onClick: () -> Unit): Modifier =
-    this.then(androidx.compose.foundation.clickable(onClick = onClick))
+    this.clickable(onClick = onClick)

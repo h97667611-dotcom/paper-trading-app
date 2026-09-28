@@ -70,7 +70,7 @@ fun HistoryScreen(factory: ViewModelFactory) {
         }
 
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 20.dp, bottom = 100.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(state.filteredTrades) { trade ->

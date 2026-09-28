@@ -9,7 +9,6 @@ sealed class NetworkResult<out T> {
     data class Success<T>(val data: T, val isFromCache: Boolean = false) : NetworkResult<T>()
     data class Error(val message: String, val isRateLimited: Boolean = false, val cachedData: Any? = null) :
         NetworkResult<Nothing>()
-    data object Loading : NetworkResult<Nothing>()
 }
 
 /** Human-readable mapping of common failure modes for this app. */

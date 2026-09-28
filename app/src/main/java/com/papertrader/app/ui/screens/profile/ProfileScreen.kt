@@ -70,7 +70,7 @@ fun ProfileScreen(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp)
         )
         LazyColumn(
-            contentPadding = PaddingValues(horizontal = 20.dp, bottom = 100.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(rows) { row ->

@@ -4,9 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,180 +12,209 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import com.papertrader.app.R
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
-private const val TOTAL_MS = 6200f
-private const val WELCOME_TEXT = "Welcome to the best\nTrading simulator"
+// Timeline in milliseconds.
+private const val TOTAL_MS = 8000f
+private const val ENTER_START = 500f
+private const val ENTER_END = 2700f
+private const val TURN_START = 5500f
+private const val TURN_END = 5800f
+private const val EXIT_END = 7500f
+private const val FADE_START = 7500f
+
+// Sprite sheet (karzl_atlas.webp, 280 x 300 px): body, raised hand and lower hand are cut apart.
+private const val ATLAS_W = 280f
+private const val ATLAS_H = 300f
+private val BODY_OFFSET = IntOffset(60, 0)
+private val BODY_SIZE = IntSize(172, 300)
+private val LEFT_HAND_OFFSET = IntOffset(2, 51)
+private val LEFT_HAND_SIZE = IntSize(46, 74)
+private val LEFT_HAND_PIVOT = Offset(24f, 112f)
+private val RIGHT_HAND_OFFSET = IntOffset(233, 173)
+private val RIGHT_HAND_SIZE = IntSize(46, 48)
+private val RIGHT_HAND_PIVOT = Offset(246f, 178f)
+private val FEET_PIVOT = Offset(146f, 296f)
 
 /**
- * Intro shown before the app starts: a white stick figure fades in, waves at the
- * viewer under the welcome text, then walks off the right side of the screen.
- * Tap anywhere to skip.
+ * App start animation: "Ghosttrade" fades in, s'Karzl waddles in from the left, stops in
+ * the middle and waves, turns around and walks off again. Tap anywhere to skip.
+ *
+ * The drawing is black-on-white, so the scene has a white background and the sprite is drawn
+ * with a multiply blend (white parts stay invisible). At the end the screen fades to black
+ * to hand over to the black app.
  */
 @Composable
 fun IntroAnimation(onFinished: () -> Unit) {
     val elapsed = remember { Animatable(0f) }
+    val atlas = ImageBitmap.imageResource(R.drawable.karzl_atlas)
     val textMeasurer = rememberTextMeasurer()
+    val titleLayout = remember {
+        textMeasurer.measure(
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.Light)) { append("Ghost") }
+                withStyle(SpanStyle(fontWeight = FontWeight.Black)) { append("trade") }
+            },
+            TextStyle(color = Color.Black, fontSize = 46.sp, letterSpacing = 1.sp)
+        )
+    }
 
     LaunchedEffect(Unit) {
         elapsed.animateTo(TOTAL_MS, tween(TOTAL_MS.toInt(), easing = LinearEasing))
         onFinished()
     }
 
-    BoxWithConstraints(
+    Canvas(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
             .pointerInput(Unit) { detectTapGestures { onFinished() } }
     ) {
-        val textLayout = remember(constraints.maxWidth) {
-            textMeasurer.measure(
-                text = WELCOME_TEXT,
-                style = TextStyle(
-                    color = Color.White,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                ),
-                constraints = Constraints(maxWidth = (constraints.maxWidth * 0.9f).toInt())
-            )
+        val t = elapsed.value
+        val w = size.width
+        val h = size.height
+        val pi = PI.toFloat()
+        val twoPi = 2f * pi
+
+        val s = min(h * 0.34f / ATLAS_H, w * 0.6f / ATLAS_W)
+        val charW = ATLAS_W * s
+        val feetY = h * 0.68f
+        val centerX = w / 2f
+
+        val enterP = ((t - ENTER_START) / (ENTER_END - ENTER_START)).coerceIn(0f, 1f)
+        val turnP = ((t - TURN_START) / (TURN_END - TURN_START)).coerceIn(0f, 1f)
+        val exitP = ((t - TURN_END) / (EXIT_END - TURN_END)).coerceIn(0f, 1f)
+        val fade = ((t - FADE_START) / (TOTAL_MS - FADE_START)).coerceIn(0f, 1f)
+
+        // Where the character is and how strongly he waddles.
+        val (x, walkAmp, walkPhase) = when {
+            t < ENTER_END -> {
+                val e = 1f - (1f - enterP) * (1f - enterP)
+                Triple(lerp(-charW * 0.7f, centerX, e), sqrt(1f - enterP), enterP * twoPi * 5f)
+            }
+            t < TURN_END -> Triple(centerX, 0f, 0f)
+            else -> {
+                val e = exitP * exitP
+                Triple(lerp(centerX, -charW * 0.9f, e), sqrt(exitP), exitP * twoPi * 4.5f)
+            }
         }
 
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val ms = elapsed.value
-            val w = size.width
-            val h = size.height
-            val figureHeight = h * 0.22f
-            val feetY = h * 0.62f
+        // Waving while he stands in the middle.
+        val waveIn = ((t - (ENTER_END - 100f)) / 300f).coerceIn(0f, 1f)
+        val waveOut = ((TURN_START - t) / 300f).coerceIn(0f, 1f)
+        val waveW = min(waveIn, waveOut)
+        val waveAngle = sin((t - ENTER_END) / 1000f * twoPi * 3f) * 28f * waveW
+        val hopP = ((t - ENTER_END) / 350f).coerceIn(0f, 1f)
+        val hop = sin(hopP * pi) * h * 0.03f
 
-            val appear = (ms / 500f).coerceIn(0f, 1f)
-            val textAlpha = ((ms - 300f) / 800f).coerceIn(0f, 1f)
+        val stride = sin(walkPhase)
+        val sway = sin(t / 1000f * twoPi * 1.4f)
+        val waddleDeg = stride * 5.5f * walkAmp + sway * 1.8f * waveW
+        val bounce = abs(stride) * h * 0.012f * walkAmp + hop
+        val leftHandDeg = waveAngle - stride * 12f * walkAmp
+        val rightHandDeg = stride * 14f * walkAmp + sin(t / 1000f * twoPi * 1.4f + 1f) * 3f * waveW
 
-            // Walking phase (starts at 3.6s, 2.4s long, smooth start/stop).
-            val walkT = ((ms - 3600f) / 2400f).coerceIn(0f, 1f)
-            val eased = walkT * walkT * (3f - 2f * walkT)
-            val cx = w / 2f + eased * w * 1.05f
-            val walkAmount = ((ms - 3500f) / 300f).coerceIn(0f, 1f)
-            val walkPhase = walkT * 2f * PI.toFloat() * 4f
+        // Turning around: horizontal flip that squeezes through zero width.
+        val facingRaw = cos(turnP * pi)
+        val facing = if (abs(facingRaw) < 0.03f) (if (facingRaw < 0f) -0.03f else 0.03f) else facingRaw
 
-            // Arm raises at 0.4s, waves until 3.4s, lowers by 3.7s.
-            val up = ((ms - 400f) / 400f).coerceIn(0f, 1f)
-            val down = ((3700f - ms) / 300f).coerceIn(0f, 1f)
-            val waveWeight = min(up, down)
-            val waveSwing = sin(ms / 1000f * 2f * PI.toFloat() * 2.4f)
+        // Background (white -> black at the very end).
+        drawRect(lerpColor(Color.White, Color.Black, fade))
 
-            // Ground line.
-            drawLine(
-                color = Color.White.copy(alpha = 0.15f * appear),
-                start = Offset(0f, feetY),
-                end = Offset(w, feetY),
-                strokeWidth = 2f
-            )
+        // "Ghosttrade" above the spot where he stands.
+        val titleIn = ((t - 100f) / 700f).coerceIn(0f, 1f)
+        val titleTop = feetY - ATLAS_H * s - titleLayout.size.height - h * 0.05f
+        drawText(
+            titleLayout,
+            topLeft = Offset((w - titleLayout.size.width) / 2f, titleTop + (1f - titleIn) * 24f),
+            alpha = titleIn * (1f - fade)
+        )
 
-            drawStickman(
-                cx = cx,
-                feetY = feetY,
-                height = figureHeight,
-                alpha = appear,
-                waveWeight = waveWeight,
-                waveSwing = waveSwing,
-                walkPhase = walkPhase,
-                walkAmount = walkAmount
-            )
+        // Soft ground shadow that shrinks while he hops.
+        val shadowShrink = 1f - (bounce / (h * 0.05f)).coerceIn(0f, 0.5f)
+        val shadowW = charW * 0.30f * shadowShrink
+        drawOval(
+            Color.Black.copy(alpha = 0.10f * (1f - fade)),
+            topLeft = Offset(x - shadowW, feetY - h * 0.004f),
+            size = Size(shadowW * 2f, h * 0.014f)
+        )
 
-            // Welcome text above the figure's head; it walks off together with him.
-            val textTop = feetY - figureHeight - figureHeight * 0.18f - textLayout.size.height
-            drawText(
-                textLayout,
-                topLeft = Offset(cx - textLayout.size.width / 2f, textTop),
-                alpha = textAlpha
-            )
+        drawKarzl(
+            atlas = atlas,
+            anchorX = x,
+            feetY = feetY,
+            scale = s,
+            facing = facing,
+            waddleDeg = waddleDeg,
+            bounce = bounce,
+            leftHandDeg = leftHandDeg,
+            rightHandDeg = rightHandDeg
+        )
+    }
+}
+
+private fun DrawScope.drawKarzl(
+    atlas: ImageBitmap,
+    anchorX: Float,
+    feetY: Float,
+    scale: Float,
+    facing: Float,
+    waddleDeg: Float,
+    bounce: Float,
+    leftHandDeg: Float,
+    rightHandDeg: Float
+) {
+    withTransform({
+        // The feet pivot of the sprite sheet ends up at (anchorX, feetY - bounce).
+        translate(anchorX, feetY - bounce)
+        scale(facing, 1f, pivot = Offset.Zero)
+        rotate(waddleDeg, pivot = Offset.Zero)
+        scale(scale, scale, pivot = Offset.Zero)
+        translate(-FEET_PIVOT.x, -FEET_PIVOT.y)
+    }) {
+        drawPart(atlas, BODY_OFFSET, BODY_SIZE)
+        withTransform({ rotate(leftHandDeg, pivot = LEFT_HAND_PIVOT) }) {
+            drawPart(atlas, LEFT_HAND_OFFSET, LEFT_HAND_SIZE)
+        }
+        withTransform({ rotate(rightHandDeg, pivot = RIGHT_HAND_PIVOT) }) {
+            drawPart(atlas, RIGHT_HAND_OFFSET, RIGHT_HAND_SIZE)
         }
     }
 }
 
-private fun DrawScope.drawStickman(
-    cx: Float,
-    feetY: Float,
-    height: Float,
-    alpha: Float,
-    waveWeight: Float,
-    waveSwing: Float,
-    walkPhase: Float,
-    walkAmount: Float
-) {
-    val color = Color.White.copy(alpha = alpha)
-    val stroke = height * 0.035f
-    val r = height * 0.12f
-    val bob = abs(sin(walkPhase)) * height * 0.02f * walkAmount
-
-    val headCenter = Offset(cx, feetY - bob - height + r)
-    val neck = Offset(cx, headCenter.y + r)
-    val shoulder = Offset(cx, neck.y + height * 0.04f)
-    val hip = Offset(cx, feetY - bob - height * 0.42f)
-    val legLen = height * 0.42f
-    val armSeg = height * 0.15f
-
-    // Angles are in degrees measured from straight down, positive toward screen right.
-    fun polar(from: Offset, len: Float, deg: Float): Offset {
-        val rad = Math.toRadians(deg.toDouble())
-        return Offset(from.x + len * sin(rad).toFloat(), from.y + len * cos(rad).toFloat())
-    }
-
-    fun limb(from: Offset, to: Offset) {
-        drawLine(color, from, to, strokeWidth = stroke, cap = StrokeCap.Round)
-    }
-
-    // Head with a simple face.
-    drawCircle(color, radius = r, center = headCenter, style = Stroke(width = stroke, cap = StrokeCap.Round))
-    drawCircle(color, radius = r * 0.1f, center = Offset(cx - r * 0.38f, headCenter.y - r * 0.15f))
-    drawCircle(color, radius = r * 0.1f, center = Offset(cx + r * 0.38f, headCenter.y - r * 0.15f))
-    drawArc(
-        color = color,
-        startAngle = 25f,
-        sweepAngle = 130f,
-        useCenter = false,
-        topLeft = Offset(cx - r * 0.5f, headCenter.y - r * 0.2f),
-        size = Size(r, r * 0.8f),
-        style = Stroke(width = stroke * 0.6f, cap = StrokeCap.Round)
+private fun DrawScope.drawPart(atlas: ImageBitmap, offset: IntOffset, size: IntSize) {
+    drawImage(
+        image = atlas,
+        srcOffset = offset,
+        srcSize = size,
+        dstOffset = offset,
+        dstSize = size,
+        blendMode = BlendMode.Multiply,
+        filterQuality = FilterQuality.High
     )
-
-    // Body.
-    limb(neck, hip)
-
-    // Legs: standing apart, or swinging while walking.
-    val swing = sin(walkPhase) * 30f * walkAmount
-    val stance = 8f * (1f - walkAmount)
-    limb(hip, polar(hip, legLen, -stance + swing))
-    limb(hip, polar(hip, legLen, stance - swing))
-
-    // Left arm (screen left): relaxed, swings opposite to the right side while walking.
-    val leftArm = -12f * (1f - walkAmount) - swing * 0.8f
-    limb(shoulder, polar(shoulder, armSeg * 2f, leftArm))
-
-    // Right arm (screen right): raised and waving, blends into a walking swing.
-    val walkArm = 12f * (1f - walkAmount) + swing * 0.8f
-    val upperDeg = lerp(walkArm, 125f, waveWeight)
-    val foreDeg = lerp(walkArm, 165f + waveSwing * 28f, waveWeight)
-    val elbow = polar(shoulder, armSeg, upperDeg)
-    val hand = polar(elbow, armSeg, foreDeg)
-    limb(shoulder, elbow)
-    limb(elbow, hand)
 }

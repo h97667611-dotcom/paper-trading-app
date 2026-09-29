@@ -9,8 +9,8 @@ import com.papertrader.app.ui.screens.funds.FundsViewModel
 import com.papertrader.app.ui.screens.history.HistoryViewModel
 import com.papertrader.app.ui.screens.markets.MarketsViewModel
 import com.papertrader.app.ui.screens.order.OrderViewModel
-import com.papertrader.app.ui.screens.positions.PositionsViewModel
 import com.papertrader.app.ui.screens.profile.ProfileViewModel
+import com.papertrader.app.ui.screens.search.SearchViewModel
 
 /** Single factory for every screen's ViewModel, backed by the app-wide [AppContainer]. */
 class ViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {
@@ -18,9 +18,9 @@ class ViewModelFactory(private val container: AppContainer) : ViewModelProvider.
         val vm: ViewModel = when (modelClass) {
             DashboardViewModel::class.java -> DashboardViewModel(container.paperTradingRepository, container.marketRepository)
             MarketsViewModel::class.java -> MarketsViewModel(container.marketRepository)
-            CoinDetailViewModel::class.java -> CoinDetailViewModel(container.marketRepository)
+            SearchViewModel::class.java -> SearchViewModel(container.marketRepository)
+            CoinDetailViewModel::class.java -> CoinDetailViewModel(container.marketRepository, container.paperTradingRepository)
             OrderViewModel::class.java -> OrderViewModel(container.paperTradingRepository, container.marketRepository)
-            PositionsViewModel::class.java -> PositionsViewModel(container.paperTradingRepository, container.marketRepository)
             HistoryViewModel::class.java -> HistoryViewModel(container.paperTradingRepository)
             FundsViewModel::class.java -> FundsViewModel(container.paperTradingRepository)
             ProfileViewModel::class.java -> ProfileViewModel(container.paperTradingRepository)

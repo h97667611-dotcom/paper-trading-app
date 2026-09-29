@@ -33,6 +33,9 @@ class PaperTraderApplication : Application(), ImageLoaderFactory {
         applicationScope.launch {
             container.marketRepository.getTopCoins(perPage = 100)
         }
+        applicationScope.launch {
+            container.marketRepository.getPopularStocks()
+        }
     }
 
     /** App-wide image loader: memory + disk cache and a short crossfade, so coin logos don't flicker. */

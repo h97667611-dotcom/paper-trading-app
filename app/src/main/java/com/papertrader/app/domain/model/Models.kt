@@ -31,6 +31,35 @@ data class Coin(
 
 data class PricePoint(val timestampMillis: Long, val price: Double)
 
+/** One OHLC candle. For line-like data open = high = low = close. */
+data class Candle(
+    val timeMillis: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    val volume: Double = 0.0
+)
+
+/** Chart time ranges with the matching candle size for each data source. */
+enum class ChartRange(
+    val label: String,
+    val intervalMillis: Long,
+    val binanceInterval: String,
+    val binanceLimit: Int,
+    val yahooRange: String,
+    val yahooInterval: String,
+    val coinGeckoDays: String
+) {
+    ONE_HOUR("1H", 60_000L, "1m", 60, "1d", "1m", "1"),
+    ONE_DAY("1D", 300_000L, "5m", 288, "1d", "5m", "1"),
+    ONE_WEEK("1W", 1_800_000L, "30m", 336, "5d", "30m", "7"),
+    ONE_MONTH("1M", 3_600_000L, "1h", 720, "1mo", "60m", "30"),
+    THREE_MONTHS("3M", 86_400_000L, "1d", 90, "3mo", "1d", "90"),
+    ONE_YEAR("1Y", 86_400_000L, "1d", 365, "1y", "1d", "365"),
+    ALL("ALL", 604_800_000L, "1w", 1000, "max", "1wk", "max")
+}
+
 data class DexPair(
     val pairAddress: String,
     val chain: String,

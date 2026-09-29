@@ -3,10 +3,16 @@ package com.papertrader.app.ui.navigation
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,42 +25,58 @@ import com.papertrader.app.ui.screens.funds.FundsScreen
 import com.papertrader.app.ui.screens.history.HistoryScreen
 import com.papertrader.app.ui.screens.markets.MarketsScreen
 import com.papertrader.app.ui.screens.order.OrderScreen
-import com.papertrader.app.ui.screens.positions.PositionsScreen
 import com.papertrader.app.ui.screens.profile.ProfileScreen
+import com.papertrader.app.ui.screens.search.SearchScreen
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
 
 /**
- * Root navigation host. "Orders" in the bottom bar shows trade history (a
- * feed of every simulated order/fill); the Positions screen (linked from
- * Portfolio) covers currently-open holdings, matching the product brief's
- * distinct Positions vs. Trade History screens.
+ * Root navigation host. Home now shows the balance and every open crypto/stock
+ * position (the old Portfolio tab was merged into it). "Orders" is the trade history.
  */
 @Composable
 fun PaperTraderNavHost(factory: ViewModelFactory) {
     val navController = rememberNavController()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
-        bottomBar = { PaperTraderBottomBar(navController) }
+        bottomBar = {
+            PaperTraderBottomBar(
+                navController = navController,
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it }
+            )
+        }
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = Screen.Dashboard.route,
             modifier = Modifier.padding(innerPadding),
-            enterTransition = { fadeIn(tween(150)) },
-            exitTransition = { fadeOut(tween(100)) },
-            popEnterTransition = { fadeIn(tween(150)) },
-            popExitTransition = { fadeOut(tween(100)) }
+            enterTransition = { fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 24 } },
+            exitTransition = { fadeOut(tween(120)) },
+            popEnterTransition = { fadeIn(tween(220)) },
+            popExitTransition = { fadeOut(tween(120)) }
         ) {
             composable(Screen.Dashboard.route) {
-                DashboardScreen(factory)
+                DashboardScreen(
+                    factory = factory,
+                    onHoldingClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) }
+                )
             }
             composable(Screen.Markets.route) {
-                MarketsScreen(factory, onCoinClick = { coinId ->
-                    navController.navigate(Screen.CoinDetail.createRoute(coinId))
+                MarketsScreen(factory, onAssetClick = { id ->
+                    navController.navigate(Screen.CoinDetail.createRoute(id))
                 })
             }
-            composable(Screen.Portfolio.route) {
-                PositionsScreen(factory)
+            composable(Screen.Search.route) {
+                SearchScreen(
+                    factory = factory,
+                    query = searchQuery,
+                    onSuggestion = { searchQuery = it },
+                    onAssetClick = { id ->
+                        searchQuery = ""
+                        navController.navigate(Screen.CoinDetail.createRoute(id))
+                    }
+                )
             }
             composable(Screen.Orders.route) {
                 HistoryScreen(factory)
@@ -78,6 +100,7 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                 CoinDetailScreen(
                     factory = factory,
                     coinId = coinId,
+                    onBack = { navController.popBackStack() },
                     onBuyClick = { navController.navigate(Screen.Order.createRoute(coinId, OrderSide.BUY.name)) },
                     onSellClick = { navController.navigate(Screen.Order.createRoute(coinId, OrderSide.SELL.name)) }
                 )
@@ -95,7 +118,7 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                     factory = factory,
                     coinId = coinId,
                     side = side,
-                    onOrderFilled = { navController.popBackStack(Screen.Portfolio.route, inclusive = false) },
+                    onOrderFilled = { goHome(navController) },
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -103,5 +126,12 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                 FundsScreen(factory, onBack = { navController.popBackStack() })
             }
         }
+    }
+}
+
+private fun goHome(navController: NavHostController) {
+    navController.navigate(Screen.Dashboard.route) {
+        popUpTo(Screen.Dashboard.route) { inclusive = false }
+        launchSingleTop = true
     }
 }

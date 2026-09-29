@@ -4,16 +4,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String) {
     data object Dashboard : Screen("dashboard")
     data object Markets : Screen("markets")
-    data object Portfolio : Screen("portfolio")
     data object Orders : Screen("orders")
     data object Profile : Screen("profile")
+    data object Search : Screen("search")
 
     data object CoinDetail : Screen("coin/{coinId}") {
         fun createRoute(coinId: String) = "coin/$coinId"
@@ -31,10 +30,10 @@ data class BottomNavItem(
     val icon: ImageVector
 )
 
+// Portfolio is merged into Home, so there is no separate Portfolio tab any more.
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Dashboard, "Home", Icons.Filled.Home),
     BottomNavItem(Screen.Markets, "Markets", Icons.Filled.TrendingUp),
-    BottomNavItem(Screen.Portfolio, "Portfolio", Icons.Filled.PieChart),
     BottomNavItem(Screen.Orders, "Orders", Icons.Filled.List),
     BottomNavItem(Screen.Profile, "Profile", Icons.Filled.AccountCircle)
 )

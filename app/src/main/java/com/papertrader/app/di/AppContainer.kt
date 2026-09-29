@@ -20,7 +20,9 @@ class AppContainer(context: Context) {
     val marketRepository: MarketRepository by lazy {
         MarketRepository(
             coinGeckoApi = NetworkModule.provideCoinGeckoApi(),
-            dexScreenerApi = NetworkModule.provideDexScreenerApi()
+            dexScreenerApi = NetworkModule.provideDexScreenerApi(),
+            binanceApi = NetworkModule.provideBinanceApi(),
+            yahooApi = NetworkModule.provideYahooApi()
         )
     }
 

@@ -12,7 +12,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,12 +24,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.papertrader.app.domain.model.DexPair
-import com.papertrader.app.ui.components.ChipPill
 import com.papertrader.app.ui.components.CoinCard
 import com.papertrader.app.ui.components.SectionHeader
+import com.papertrader.app.ui.components.TextTabs
 import com.papertrader.app.ui.components.bounceClick
 import com.papertrader.app.ui.components.formatPercent
 import com.papertrader.app.ui.components.formatPriceSmart
@@ -37,22 +42,29 @@ import com.papertrader.app.ui.theme.TextSecondary
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
 
 @Composable
-fun MarketsScreen(factory: ViewModelFactory, onAssetClick: (String) -> Unit) {
+fun MarketsScreen(factory: ViewModelFactory, onAssetClick: (String) -> Unit, onSearchClick: () -> Unit) {
     val viewModel: MarketsViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 8.dp, top = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text("Markets", style = MaterialTheme.typography.headlineMedium)
-            Row(
-                modifier = Modifier.padding(top = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ChipPill("Crypto", state.selectedTab == MarketsTab.COINS, { viewModel.selectTab(MarketsTab.COINS) })
-                ChipPill("Stocks", state.selectedTab == MarketsTab.STOCKS, { viewModel.selectTab(MarketsTab.STOCKS) })
-                ChipPill("DEX", state.selectedTab == MarketsTab.DEX_PAIRS, { viewModel.selectTab(MarketsTab.DEX_PAIRS) })
+            IconButton(onClick = onSearchClick) {
+                Icon(Icons.Filled.Search, contentDescription = "Search", tint = Color.White)
             }
         }
+        TextTabs(
+            labels = listOf("Crypto", "Stocks", "DEX"),
+            selected = state.selectedTab.ordinal,
+            onSelect = { viewModel.selectTab(MarketsTab.values()[it]) },
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+        )
 
         Crossfade(
             targetState = state.selectedTab,
@@ -71,7 +83,7 @@ fun MarketsScreen(factory: ViewModelFactory, onAssetClick: (String) -> Unit) {
 @Composable
 private fun CoinsTabContent(state: MarketsUiState, onAssetClick: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 120.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         if (state.isLoading && state.allCoins.isEmpty()) {
@@ -105,7 +117,7 @@ private fun CoinsTabContent(state: MarketsUiState, onAssetClick: (String) -> Uni
 @Composable
 private fun StocksTabContent(state: MarketsUiState, onAssetClick: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 120.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         if (state.isStocksLoading && state.stocks.isEmpty()) {
@@ -128,7 +140,7 @@ private fun StocksTabContent(state: MarketsUiState, onAssetClick: (String) -> Un
 @Composable
 private fun DexPairsTabContent(pairs: List<DexPair>) {
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 120.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(pairs, key = { it.pairAddress }) { pair ->

@@ -7,10 +7,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -30,22 +26,19 @@ import com.papertrader.app.ui.screens.search.SearchScreen
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
 
 /**
- * Root navigation host. Home now shows the balance and every open crypto/stock
- * position (the old Portfolio tab was merged into it). "Orders" is the trade history.
+ * Root navigation host. Home is the wallet screen (balance + crypto and stock holdings),
+ * the round Trade button in the bottom bar opens search, and "Orders" is the trade history.
  */
 @Composable
 fun PaperTraderNavHost(factory: ViewModelFactory) {
     val navController = rememberNavController()
-    var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    fun openSearch() {
+        navController.navigate(Screen.Search.route) { launchSingleTop = true }
+    }
 
     Scaffold(
-        bottomBar = {
-            PaperTraderBottomBar(
-                navController = navController,
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it }
-            )
-        }
+        bottomBar = { PaperTraderBottomBar(navController) }
     ) { innerPadding ->
         NavHost(
             navController = navController,
@@ -59,23 +52,27 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
                     factory = factory,
-                    onHoldingClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) }
+                    onHoldingClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) },
+                    onAddFunds = { navController.navigate(Screen.Funds.route) },
+                    onTrade = { openSearch() },
+                    onHistory = { navController.switchTab(Screen.Orders.route) },
+                    onMore = { navController.switchTab(Screen.Profile.route) },
+                    onSearch = { openSearch() },
+                    onBrowseMarkets = { navController.switchTab(Screen.Markets.route) }
                 )
             }
             composable(Screen.Markets.route) {
-                MarketsScreen(factory, onAssetClick = { id ->
-                    navController.navigate(Screen.CoinDetail.createRoute(id))
-                })
+                MarketsScreen(
+                    factory = factory,
+                    onAssetClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) },
+                    onSearchClick = { openSearch() }
+                )
             }
             composable(Screen.Search.route) {
                 SearchScreen(
                     factory = factory,
-                    query = searchQuery,
-                    onSuggestion = { searchQuery = it },
-                    onAssetClick = { id ->
-                        searchQuery = ""
-                        navController.navigate(Screen.CoinDetail.createRoute(id))
-                    }
+                    onBack = { navController.popBackStack() },
+                    onAssetClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) }
                 )
             }
             composable(Screen.Orders.route) {

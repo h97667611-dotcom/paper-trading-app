@@ -43,7 +43,8 @@ data class HoldingUi(
     val cost: Double,
     val pnl: Double,
     val pnlPercent: Double,
-    val dayPnl: Double
+    val dayPnl: Double,
+    val dayChangePercent: Double
 )
 
 data class DashboardUiState(
@@ -194,7 +195,8 @@ class DashboardViewModel(
             cost = cost,
             pnl = pnl,
             pnlPercent = pctOf(pnl, cost),
-            dayPnl = dayPnl
+            dayPnl = dayPnl,
+            dayChangePercent = coin?.priceChangePercent24h ?: 0.0
         )
     }
 

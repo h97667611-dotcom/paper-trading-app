@@ -124,6 +124,7 @@ fun InteractiveChart(
     modifier: Modifier = Modifier,
     height: Dp = 300.dp,
     showAxes: Boolean = true,
+    showVolume: Boolean = false,
     onScrub: (Candle?) -> Unit = {}
 ) {
     val measurer = rememberTextMeasurer()
@@ -171,7 +172,7 @@ fun InteractiveChart(
             }
     ) {
         if (series.size < 2) return@Canvas
-        drawChart(series, style, measurer, showAxes, axisFormat, pillFormat, scrubIndex)
+        drawChart(series, style, measurer, showAxes, showVolume, axisFormat, pillFormat, scrubIndex)
     }
 }
 
@@ -201,6 +202,7 @@ private fun DrawScope.drawChart(
     style: ChartStyle,
     measurer: TextMeasurer,
     showAxes: Boolean,
+    showVolume: Boolean,
     axisFormat: SimpleDateFormat,
     pillFormat: SimpleDateFormat,
     scrubIndex: Int?
@@ -213,6 +215,11 @@ private fun DrawScope.drawChart(
     val plotH = size.height - plotT - gutterB
     val plotB = plotT + plotH
     if (plotW <= 0f || plotH <= 0f) return
+    // With volume bars the price area gets the upper part and the bars the bottom ~20%.
+    val volGap = if (showVolume) 8.dp.toPx() else 0f
+    val volH = if (showVolume) plotH * 0.2f else 0f
+    val priceH = plotH - volH - volGap
+    val priceB = plotT + priceH
 
     var lo = Double.MAX_VALUE
     var hi = -Double.MAX_VALUE
@@ -231,7 +238,7 @@ private fun DrawScope.drawChart(
     val bottom = lo - pad
     val span = top - bottom
 
-    fun yOf(p: Double): Float = plotT + (((top - p) / span) * plotH).toFloat()
+    fun yOf(p: Double): Float = plotT + (((top - p) / span) * priceH).toFloat()
     val slot = plotW / n
     fun xOf(i: Int): Float = (i + 0.5f) * slot
 
@@ -250,7 +257,7 @@ private fun DrawScope.drawChart(
         val lines = 4
         for (k in 0..lines) {
             val price = top - span * k / lines
-            val y = plotT + plotH * k / lines
+            val y = plotT + priceH * k / lines
             drawLine(Color.White.copy(alpha = 0.06f), Offset(0f, y), Offset(plotW, y), strokeWidth = 1f)
             val layout = measurer.measure(formatChartPrice(price), axisStyle)
             drawText(
@@ -299,8 +306,8 @@ private fun DrawScope.drawChart(
         ChartStyle.AREA -> {
             val fill = Path().apply {
                 addPath(linePath)
-                lineTo(xOf(n - 1), plotB)
-                lineTo(xOf(0), plotB)
+                lineTo(xOf(n - 1), priceB)
+                lineTo(xOf(0), priceB)
                 close()
             }
             drawPath(
@@ -308,7 +315,7 @@ private fun DrawScope.drawChart(
                 brush = Brush.verticalGradient(
                     colors = listOf(trend.copy(alpha = 0.32f), Color.Transparent),
                     startY = plotT,
-                    endY = plotB
+                    endY = priceB
                 )
             )
             drawPath(linePath, trend, style = lineStroke)
@@ -332,7 +339,7 @@ private fun DrawScope.drawChart(
         }
 
         ChartStyle.BASELINE -> {
-            val by = yOf(firstClose).coerceIn(plotT, plotB)
+            val by = yOf(firstClose).coerceIn(plotT, priceB)
             val fill = Path().apply {
                 addPath(linePath)
                 lineTo(xOf(n - 1), by)
@@ -343,7 +350,7 @@ private fun DrawScope.drawChart(
                 drawPath(fill, UpColor.copy(alpha = 0.22f))
                 drawPath(linePath, UpColor, style = lineStroke)
             }
-            clipRect(0f, by, plotW, plotB) {
+            clipRect(0f, by, plotW, priceB) {
                 drawPath(fill, DownColor.copy(alpha = 0.22f))
                 drawPath(linePath, DownColor, style = lineStroke)
             }
@@ -361,7 +368,7 @@ private fun DrawScope.drawChart(
                 val color = if (c.close >= c.open) UpColor else DownColor
                 val x = xOf(i)
                 val y = yOf(c.close)
-                drawRect(color.copy(alpha = 0.9f), Offset(x - bodyW / 2f, y), Size(bodyW, max(1f, plotB - y)))
+                drawRect(color.copy(alpha = 0.9f), Offset(x - bodyW / 2f, y), Size(bodyW, max(1f, priceB - y)))
             }
         }
 
@@ -400,6 +407,19 @@ private fun DrawScope.drawChart(
                 val yH = yOf(c.high)
                 val yL = yOf(c.low)
                 drawRect(color, Offset(x - bodyW * 0.45f, yH), Size(bodyW * 0.9f, max(2f, yL - yH)))
+            }
+        }
+    }
+
+    // Volume bars
+    if (showVolume) {
+        var maxVol = 0.0
+        for (c in series) if (c.volume > maxVol) maxVol = c.volume
+        if (maxVol > 0.0) {
+            series.forEachIndexed { i, c ->
+                val barH = max(1f, (c.volume / maxVol * volH).toFloat())
+                val color = if (c.close >= c.open) UpColor else DownColor
+                drawRect(color.copy(alpha = 0.55f), Offset(xOf(i) - bodyW / 2f, plotB - barH), Size(bodyW, barH))
             }
         }
     }

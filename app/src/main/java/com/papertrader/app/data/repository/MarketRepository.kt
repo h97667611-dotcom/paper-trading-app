@@ -2,6 +2,7 @@ package com.papertrader.app.data.repository
 
 import com.google.gson.JsonElement
 import com.papertrader.app.data.remote.binance.BinanceApi
+import com.papertrader.app.data.remote.binance.BinanceTickerDto
 import com.papertrader.app.data.remote.coingecko.CoinGeckoApi
 import com.papertrader.app.data.remote.dexscreener.DexScreenerApi
 import com.papertrader.app.data.remote.yahoo.YahooFinanceApi
@@ -19,6 +20,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
@@ -47,6 +50,8 @@ class MarketRepository(
     private val candleCache = ConcurrentHashMap<String, CacheEntry<List<Candle>>>()
     private val stockQuoteCache = ConcurrentHashMap<String, CacheEntry<Coin>>()
     private val unsupportedBinanceSymbols: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val topCoinsMutex = Mutex()
+    @Volatile private var coinGeckoCooldownUntil = 0L
 
     // ---------- Instant-paint helpers ----------
 
@@ -68,13 +73,32 @@ class MarketRepository(
 
     // ---------- Crypto lists ----------
 
+    /**
+     * Top coins. CoinGecko first (real market caps); if it is rate-limited or down, the list is
+     * built from [SeedCoins] with live prices from Binance, so this never comes back empty.
+     */
     suspend fun getTopCoins(perPage: Int = 100): NetworkResult<List<Coin>> {
-        val cacheKey = "top_$perPage"
-        return withRetryAndCache(
-            cache = marketsCache,
-            cacheKey = cacheKey,
-            fetch = { coinGeckoApi.getMarkets(perPage = perPage).map { it.toDomain() } }
-        )
+        val key = "top_$perPage"
+        return topCoinsMutex.withLock {
+            val cached = marketsCache[key]
+            if (cached != null && System.currentTimeMillis() - cached.timestampMillis < CACHE_TTL_MILLIS) {
+                return@withLock NetworkResult.Success(cached.value)
+            }
+            val fromGecko = safeCall {
+                coinGeckoCall { coinGeckoApi.getMarkets(perPage = perPage).map { it.toDomain() } }
+            }
+            if (!fromGecko.isNullOrEmpty()) {
+                marketsCache[key] = CacheEntry(fromGecko, System.currentTimeMillis())
+                return@withLock NetworkResult.Success(fromGecko)
+            }
+            val fallback = fetchSeedCoins(SeedCoins.all.take(perPage))
+            if (fallback.isNotEmpty()) {
+                marketsCache[key] = CacheEntry(fallback, System.currentTimeMillis())
+                return@withLock NetworkResult.Success(fallback)
+            }
+            if (cached != null) NetworkResult.Success(cached.value, isFromCache = true)
+            else NetworkResult.Error(ErrorMessages.API_UNREACHABLE)
+        }
     }
 
     /** Works for crypto ids and "stock_" ids alike. */
@@ -94,23 +118,68 @@ class MarketRepository(
 
     private suspend fun getCryptoCoinsByIds(ids: List<String>): NetworkResult<List<Coin>> {
         freshCoinsFromTopCache(ids)?.let { return NetworkResult.Success(it) }
-        val cacheKey = "ids_${ids.sorted().joinToString(",")}"
-        return withRetryAndCache(
-            cache = marketsCache,
-            cacheKey = cacheKey,
-            fetch = { coinGeckoApi.getMarketsByIds(ids = ids.joinToString(",")).map { it.toDomain() } }
-        )
+        val key = "ids_${ids.sorted().joinToString(",")}"
+        val cached = marketsCache[key]
+        if (cached != null && System.currentTimeMillis() - cached.timestampMillis < CACHE_TTL_MILLIS) {
+            return NetworkResult.Success(cached.value)
+        }
+        val fromGecko = safeCall {
+            coinGeckoCall { coinGeckoApi.getMarketsByIds(ids = ids.joinToString(",")).map { it.toDomain() } }
+        }
+        if (!fromGecko.isNullOrEmpty()) {
+            marketsCache[key] = CacheEntry(fromGecko, System.currentTimeMillis())
+            return NetworkResult.Success(fromGecko)
+        }
+        val seeds = ids.mapNotNull { SeedCoins.byId[it] }
+        if (seeds.isNotEmpty()) {
+            val fallback = fetchSeedCoins(seeds)
+            if (fallback.isNotEmpty()) {
+                marketsCache[key] = CacheEntry(fallback, System.currentTimeMillis())
+                return NetworkResult.Success(fallback)
+            }
+        }
+        return if (cached != null) NetworkResult.Success(cached.value, isFromCache = true)
+        else NetworkResult.Error(ErrorMessages.API_UNREACHABLE)
     }
 
     suspend fun searchCoins(query: String): NetworkResult<List<Coin>> {
         if (query.isBlank()) return NetworkResult.Success(emptyList())
-        return try {
-            val results = coinGeckoApi.search(query).coins.take(15)
-            getCoinsByIds(results.map { it.id })
-        } catch (e: CancellationException) {
+        val q = query.trim()
+        val ids = safeCall { coinGeckoCall { coinGeckoApi.search(q).coins.take(15).map { it.id } } }
+            ?: SeedCoins.all
+                .filter { it.name.contains(q, ignoreCase = true) || it.symbol.contains(q, ignoreCase = true) }
+                .take(15)
+                .map { it.id }
+        if (ids.isEmpty()) return NetworkResult.Success(emptyList())
+        return getCoinsByIds(ids)
+    }
+
+    /** Live prices from Binance for coins we know by CoinGecko id (the fallback data source). */
+    private suspend fun fetchSeedCoins(seeds: List<SeedCoin>): List<Coin> {
+        val tradable = seeds.filter { it.symbol != "USDT" }
+        val tickers: Map<String, BinanceTickerDto> = if (tradable.isEmpty()) {
+            emptyMap()
+        } else {
+            val symbolsJson = tradable.joinToString(prefix = "[", postfix = "]", separator = ",") { "\"${it.symbol}USDT\"" }
+            val list = safeCall { binanceApi.getTickers(symbolsJson) }
+                ?: safeCall { binanceApi.getAllTickers() }.orEmpty()
+            list.associateBy { it.symbol }
+        }
+        return seeds.mapNotNull { seed -> seed.toCoin(tickers[seed.symbol + "USDT"]) }
+    }
+
+    private class CoinGeckoCoolingDownException : IOException("CoinGecko cooling down")
+
+    /** After a rate-limit/auth error CoinGecko is skipped for a minute instead of hammering it. */
+    private suspend fun <T> coinGeckoCall(block: suspend () -> T): T {
+        if (System.currentTimeMillis() < coinGeckoCooldownUntil) throw CoinGeckoCoolingDownException()
+        try {
+            return block()
+        } catch (e: HttpException) {
+            if (e.code() == 429 || e.code() == 401 || e.code() == 403) {
+                coinGeckoCooldownUntil = System.currentTimeMillis() + COINGECKO_COOLDOWN_MILLIS
+            }
             throw e
-        } catch (e: Exception) {
-            NetworkResult.Error(e.toUserMessage())
         }
     }
 
@@ -236,7 +305,7 @@ class MarketRepository(
                 // Exchange not reachable: fall back to CoinGecko below.
             }
         }
-        val prices = coinGeckoApi.getMarketChart(coinId = coin.id, days = range.coinGeckoDays).prices
+        val prices = coinGeckoCall { coinGeckoApi.getMarketChart(coinId = coin.id, days = range.coinGeckoDays).prices }
         return pricesToCandles(prices, range)
     }
 
@@ -352,6 +421,7 @@ class MarketRepository(
         private const val RETRY_BACKOFF_MILLIS = 800L
         private const val RATE_LIMIT_BACKOFF_MILLIS = 2_000L
         private const val MIN_MARKET_CAP_FOR_EXCHANGE_DATA = 100_000_000.0
+        private const val COINGECKO_COOLDOWN_MILLIS = 60_000L
 
         val POPULAR_STOCKS = listOf(
             "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AMD",
@@ -422,5 +492,34 @@ private fun com.papertrader.app.data.remote.dexscreener.DexPairDto.toDomainOrNul
         liquidityUsd = liquidity?.usd ?: 0.0,
         volume24h = volume?.h24 ?: 0.0,
         url = url
+    )
+}
+
+private fun SeedCoin.toCoin(ticker: BinanceTickerDto?): Coin? {
+    if (symbol == "USDT") {
+        return Coin(
+            id = id, symbol = symbol, name = name, imageUrl = image.ifEmpty { null },
+            currentPrice = 1.0, priceChangePercent24h = 0.0, marketCap = supply,
+            volume24h = 0.0, high24h = 1.0, low24h = 1.0, ath = 1.0, atl = 1.0
+        )
+    }
+    val t = ticker ?: return null
+    val price = t.lastPrice.toDoubleOrNull() ?: return null
+    if (price <= 0.0) return null
+    val high = t.highPrice.toDoubleOrNull() ?: price
+    val low = t.lowPrice.toDoubleOrNull() ?: price
+    return Coin(
+        id = id,
+        symbol = symbol,
+        name = name,
+        imageUrl = image.ifEmpty { null },
+        currentPrice = price,
+        priceChangePercent24h = t.priceChangePercent.toDoubleOrNull() ?: 0.0,
+        marketCap = price * supply,
+        volume24h = t.quoteVolume.toDoubleOrNull() ?: 0.0,
+        high24h = high,
+        low24h = low,
+        ath = high,
+        atl = low
     )
 }

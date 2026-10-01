@@ -3,6 +3,8 @@ package com.papertrader.app.ui.screens.markets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papertrader.app.data.repository.MarketRepository
+import com.papertrader.app.domain.model.BetCategory
+import com.papertrader.app.domain.model.BetMarket
 import com.papertrader.app.domain.model.Coin
 import com.papertrader.app.domain.model.DexPair
 import com.papertrader.app.util.NetworkResult
@@ -12,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class MarketsTab { COINS, STOCKS, DEX_PAIRS }
+enum class MarketsTab { COINS, STOCKS, BETS, SPORTS, DEX_PAIRS }
 
 data class MarketsUiState(
     val isLoading: Boolean = true,
@@ -24,6 +26,11 @@ data class MarketsUiState(
     val stocks: List<Coin> = emptyList(),
     val isStocksLoading: Boolean = true,
     val stocksError: String? = null,
+    val betCategory: BetCategory = BetCategory.TRENDING,
+    val bets: List<BetMarket> = emptyList(),
+    val betsFor: BetCategory? = null,
+    val isBetsLoading: Boolean = false,
+    val betsError: String? = null,
     val dexPairs: List<DexPair> = emptyList(),
     val isFromCache: Boolean = false,
     val errorMessage: String? = null
@@ -43,6 +50,16 @@ class MarketsViewModel(private val marketRepository: MarketRepository) : ViewMod
 
     fun selectTab(tab: MarketsTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+        when (tab) {
+            MarketsTab.BETS -> loadBets(_uiState.value.betCategory)
+            MarketsTab.SPORTS -> loadBets(BetCategory.SPORTS)
+            else -> Unit
+        }
+    }
+
+    fun selectBetCategory(category: BetCategory) {
+        _uiState.update { it.copy(betCategory = category) }
+        loadBets(category)
     }
 
     fun refresh() {
@@ -87,6 +104,20 @@ class MarketsViewModel(private val marketRepository: MarketRepository) : ViewMod
                 }
                 is NetworkResult.Error -> _uiState.update {
                     it.copy(isStocksLoading = false, stocksError = result.message)
+                }
+            }
+        }
+    }
+
+    private fun loadBets(category: BetCategory) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBetsLoading = true, betsError = null) }
+            when (val result = marketRepository.getBetMarkets(category)) {
+                is NetworkResult.Success -> _uiState.update {
+                    it.copy(isBetsLoading = false, bets = result.data, betsFor = category)
+                }
+                is NetworkResult.Error -> _uiState.update {
+                    it.copy(isBetsLoading = false, betsError = result.message, bets = emptyList(), betsFor = category)
                 }
             }
         }

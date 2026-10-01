@@ -26,8 +26,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.papertrader.app.domain.model.BetCategory
 import com.papertrader.app.domain.model.DexPair
+import com.papertrader.app.ui.components.BetRow
+import com.papertrader.app.ui.components.ChipPill
 import com.papertrader.app.ui.components.CoinCard
 import com.papertrader.app.ui.components.SectionHeader
 import com.papertrader.app.ui.components.TextTabs
@@ -42,7 +46,12 @@ import com.papertrader.app.ui.theme.TextSecondary
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
 
 @Composable
-fun MarketsScreen(factory: ViewModelFactory, onAssetClick: (String) -> Unit, onSearchClick: () -> Unit) {
+fun MarketsScreen(
+    factory: ViewModelFactory,
+    onAssetClick: (String) -> Unit,
+    onSearchClick: () -> Unit,
+    onBetClick: (String) -> Unit
+) {
     val viewModel: MarketsViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsState()
 
@@ -60,7 +69,7 @@ fun MarketsScreen(factory: ViewModelFactory, onAssetClick: (String) -> Unit, onS
             }
         }
         TextTabs(
-            labels = listOf("Crypto", "Stocks", "DEX"),
+            labels = listOf("Crypto", "Stocks", "Bets", "Sports", "DEX"),
             selected = state.selectedTab.ordinal,
             onSelect = { viewModel.selectTab(MarketsTab.values()[it]) },
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
@@ -74,6 +83,8 @@ fun MarketsScreen(factory: ViewModelFactory, onAssetClick: (String) -> Unit, onS
             when (tab) {
                 MarketsTab.COINS -> CoinsTabContent(state, onAssetClick)
                 MarketsTab.STOCKS -> StocksTabContent(state, onAssetClick)
+                MarketsTab.BETS -> BetsTabContent(state, false, viewModel::selectBetCategory, onBetClick)
+                MarketsTab.SPORTS -> BetsTabContent(state, true, viewModel::selectBetCategory, onBetClick)
                 MarketsTab.DEX_PAIRS -> DexPairsTabContent(state.dexPairs)
             }
         }
@@ -133,6 +144,50 @@ private fun StocksTabContent(state: MarketsUiState, onAssetClick: (String) -> Un
             items(state.stocks, key = { it.id }) { coin ->
                 CoinCard(coin = coin, onClick = { onAssetClick(coin.id) })
             }
+        }
+    }
+}
+
+/** Polymarket markets. On the Sports tab odds are shown as decimal betting odds. */
+@Composable
+private fun BetsTabContent(
+    state: MarketsUiState,
+    sports: Boolean,
+    onCategory: (BetCategory) -> Unit,
+    onBetClick: (String) -> Unit
+) {
+    val expected = if (sports) BetCategory.SPORTS else state.betCategory
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        if (!sports) {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(BetCategory.values().filter { it != BetCategory.SPORTS }, key = { it.name }) { category ->
+                        ChipPill(category.label, category == state.betCategory, { onCategory(category) })
+                    }
+                }
+            }
+        }
+        if (state.isBetsLoading && state.betsFor != expected) {
+            item { LoadingBox() }
+        }
+        if (state.betsFor == expected) {
+            items(state.bets, key = { "b_${it.id}" }) { market ->
+                BetRow(market, decimalOdds = sports) { onBetClick(market.tokenIds.first()) }
+            }
+            if (state.bets.isEmpty() && !state.isBetsLoading) {
+                item { Text(state.betsError ?: "Nothing here right now.", color = TextSecondary, modifier = Modifier.padding(top = 16.dp)) }
+            }
+        }
+        item {
+            Text(
+                "Powered by Polymarket. Paper trading with simulated money.",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 16.dp)
+            )
         }
     }
 }

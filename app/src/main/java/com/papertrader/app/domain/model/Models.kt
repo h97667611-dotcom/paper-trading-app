@@ -26,7 +26,8 @@ data class Coin(
     val high24h: Double,
     val low24h: Double,
     val ath: Double,
-    val atl: Double
+    val atl: Double,
+    val resolved: Boolean = false
 )
 
 data class PricePoint(val timestampMillis: Long, val price: Double)

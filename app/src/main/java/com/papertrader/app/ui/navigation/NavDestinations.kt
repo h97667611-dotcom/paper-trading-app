@@ -22,6 +22,9 @@ sealed class Screen(val route: String) {
     }
     data object Funds : Screen("funds")
     data object FundsHistory : Screen("funds_history")
+    data object BetDetail : Screen("bet/{tokenId}") {
+        fun createRoute(tokenId: String) = "bet/$tokenId"
+    }
 }
 
 data class BottomNavItem(

@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.papertrader.app.ui.components.BetRow
 import com.papertrader.app.ui.components.ChipPill
 import com.papertrader.app.ui.components.CoinCard
 import com.papertrader.app.ui.components.SectionHeader
@@ -67,7 +68,8 @@ private val SUGGESTIONS = listOf("Bitcoin", "Ethereum", "Solana", "Apple", "Tesl
 fun SearchScreen(
     factory: ViewModelFactory,
     onBack: () -> Unit,
-    onAssetClick: (String) -> Unit
+    onAssetClick: (String) -> Unit,
+    onBetClick: (String) -> Unit
 ) {
     val viewModel: SearchViewModel = viewModel(factory = factory)
     var query by rememberSaveable { mutableStateOf("") }
@@ -173,7 +175,13 @@ fun SearchScreen(
                         CoinCard(coin = coin, onClick = { onAssetClick(coin.id) })
                     }
                 }
-                if (!state.isLoading && state.crypto.isEmpty() && state.stocks.isEmpty() && state.query == query) {
+                if (state.bets.isNotEmpty()) {
+                    item { SectionHeader("Bets") }
+                    items(state.bets, key = { "b_${it.id}" }) { market ->
+                        BetRow(market, decimalOdds = market.isSports) { onBetClick(market.tokenIds.first()) }
+                    }
+                }
+                if (!state.isLoading && state.crypto.isEmpty() && state.stocks.isEmpty() && state.bets.isEmpty() && state.query == query) {
                     item {
                         Text(
                             state.errorMessage ?: "No results for \"$query\".",

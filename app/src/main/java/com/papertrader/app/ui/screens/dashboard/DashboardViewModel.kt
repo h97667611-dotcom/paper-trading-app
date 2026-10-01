@@ -37,6 +37,7 @@ data class HoldingUi(
     val name: String,
     val imageUrl: String?,
     val isStock: Boolean,
+    val isBet: Boolean,
     val quantity: Double,
     val price: Double,
     val value: Double,
@@ -61,6 +62,7 @@ data class DashboardUiState(
     val selectedPeriod: ChartPeriod = ChartPeriod.ONE_DAY,
     val cryptoHoldings: List<HoldingUi> = emptyList(),
     val stockHoldings: List<HoldingUi> = emptyList(),
+    val betHoldings: List<HoldingUi> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -140,6 +142,14 @@ class DashboardViewModel(
                 }
             }
 
+            // Resolved prediction markets pay $1 or $0 per share: settle those positions automatically.
+            for (pos in positions) {
+                val resolvedCoin = coinsById[pos.coinId]
+                if (AssetIds.isBet(pos.coinId) && resolvedCoin != null && resolvedCoin.resolved) {
+                    tradingRepository.closePosition(pos.coinId, maxOf(resolvedCoin.currentPrice, 0.0001))
+                }
+            }
+
             val holdings = positions
                 .map { buildHolding(it, coinsById[it.coinId]) }
                 .sortedByDescending { it.value }
@@ -167,8 +177,9 @@ class DashboardViewModel(
                     unrealizedPnl = unrealized,
                     totalPnl = totalPnl,
                     totalPnlPercent = pctOf(totalPnl, startingCapital),
-                    cryptoHoldings = holdings.filter { h -> !h.isStock },
+                    cryptoHoldings = holdings.filter { h -> !h.isStock && !h.isBet },
                     stockHoldings = holdings.filter { h -> h.isStock },
+                    betHoldings = holdings.filter { h -> h.isBet },
                     errorMessage = error
                 )
             }
@@ -177,7 +188,12 @@ class DashboardViewModel(
     }
 
     private fun buildHolding(pos: Position, coin: Coin?): HoldingUi {
-        val price = coin?.currentPrice?.takeIf { it > 0.0 } ?: pos.avgEntryPrice
+        val isBet = AssetIds.isBet(pos.coinId)
+        val price = when {
+            coin == null -> pos.avgEntryPrice
+            coin.currentPrice > 0.0 || isBet -> coin.currentPrice // a lost bet really is worth 0
+            else -> pos.avgEntryPrice
+        }
         val value = pos.quantity * price
         val cost = pos.quantity * pos.avgEntryPrice
         val pnl = value - cost
@@ -189,6 +205,7 @@ class DashboardViewModel(
             name = coin?.name ?: pos.symbol,
             imageUrl = coin?.imageUrl,
             isStock = AssetIds.isStock(pos.coinId),
+            isBet = AssetIds.isBet(pos.coinId),
             quantity = pos.quantity,
             price = price,
             value = value,

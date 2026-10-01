@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -89,7 +90,11 @@ fun DashboardScreen(
     val chartCandles = remember(state.chartPoints) {
         state.chartPoints.map { Candle(it.timestampMillis, it.price, it.price, it.price, it.price) }
     }
-    val holdings = if (tab == 0) state.cryptoHoldings else state.stockHoldings
+    val holdings = when (tab) {
+        0 -> state.cryptoHoldings
+        1 -> state.stockHoldings
+        else -> state.betHoldings
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -241,7 +246,7 @@ fun DashboardScreen(
 
         item {
             TextTabs(
-                labels = listOf("Crypto", "Stocks"),
+                labels = listOf("Crypto", "Stocks", "Bets"),
                 selected = tab,
                 onSelect = { tab = it },
                 modifier = Modifier.padding(top = 30.dp, bottom = 6.dp)
@@ -264,7 +269,7 @@ fun DashboardScreen(
         items(holdings, key = { "h_${it.coinId}" }) { h ->
             AssetRow(
                 imageUrl = h.imageUrl,
-                symbol = h.symbol,
+                symbol = if (h.isBet) "${h.symbol} \u00B7 ${h.name}" else h.symbol,
                 price = h.price,
                 changePct = h.dayChangePercent,
                 quantity = formatQuantity(h.quantity),
@@ -276,7 +281,11 @@ fun DashboardScreen(
             item {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     Text(
-                        if (tab == 0) "No crypto positions yet." else "No stock positions yet.",
+                        when (tab) {
+                            0 -> "No crypto positions yet."
+                            1 -> "No stock positions yet."
+                            else -> "No bets yet. Open Markets > Bets or Sports."
+                        },
                         color = TextSecondary
                     )
                     Spacer(Modifier.height(12.dp))
@@ -319,10 +328,14 @@ private fun AssetRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             CoinLogo(imageUrl = imageUrl, symbol = symbol)
-            Column {
-                Text(symbol, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(symbol, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row {
                     Text(formatPriceSmart(price), color = TextSecondary, fontSize = 13.sp)
                     if (changePct != null) {
@@ -336,7 +349,7 @@ private fun AssetRow(
                 }
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
+        Column(modifier = Modifier.padding(start = 12.dp), horizontalAlignment = Alignment.End) {
             Text(quantity, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text(value, color = TextSecondary, fontSize = 13.sp)
         }

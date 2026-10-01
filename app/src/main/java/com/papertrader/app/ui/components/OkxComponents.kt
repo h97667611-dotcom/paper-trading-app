@@ -1,6 +1,8 @@
 package com.papertrader.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +30,7 @@ import com.papertrader.app.ui.theme.TextSecondary
 /** Text tabs with a short underline below the selected one, like "Crypto  NFTs  DeFi". */
 @Composable
 fun TextTabs(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+    Row(modifier = modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
         labels.forEachIndexed { index, label ->
             val isSelected = index == selected
             Column(

@@ -14,7 +14,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.papertrader.app.domain.model.AssetIds
 import com.papertrader.app.domain.model.OrderSide
+import com.papertrader.app.ui.screens.bets.BetDetailScreen
 import com.papertrader.app.ui.screens.coindetail.CoinDetailScreen
 import com.papertrader.app.ui.screens.dashboard.DashboardScreen
 import com.papertrader.app.ui.screens.funds.FundsScreen
@@ -37,6 +39,11 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
         navController.navigate(Screen.Search.route) { launchSingleTop = true }
     }
 
+    fun openAsset(id: String) {
+        if (AssetIds.isBet(id)) navController.navigate(Screen.BetDetail.createRoute(AssetIds.betToken(id)))
+        else navController.navigate(Screen.CoinDetail.createRoute(id))
+    }
+
     Scaffold(
         bottomBar = { PaperTraderBottomBar(navController) }
     ) { innerPadding ->
@@ -52,7 +59,7 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
                     factory = factory,
-                    onHoldingClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) },
+                    onHoldingClick = { id -> openAsset(id) },
                     onAddFunds = { navController.navigate(Screen.Funds.route) },
                     onTrade = { openSearch() },
                     onHistory = { navController.switchTab(Screen.Orders.route) },
@@ -65,14 +72,16 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                 MarketsScreen(
                     factory = factory,
                     onAssetClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) },
-                    onSearchClick = { openSearch() }
+                    onSearchClick = { openSearch() },
+                    onBetClick = { token -> navController.navigate(Screen.BetDetail.createRoute(token)) }
                 )
             }
             composable(Screen.Search.route) {
                 SearchScreen(
                     factory = factory,
                     onBack = { navController.popBackStack() },
-                    onAssetClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) }
+                    onAssetClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) },
+                    onBetClick = { token -> navController.navigate(Screen.BetDetail.createRoute(token)) }
                 )
             }
             composable(Screen.Orders.route) {
@@ -117,6 +126,18 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                     side = side,
                     onOrderFilled = { goHome(navController) },
                     onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = Screen.BetDetail.route,
+                arguments = listOf(navArgument("tokenId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val tokenId = backStackEntry.arguments?.getString("tokenId").orEmpty()
+                BetDetailScreen(
+                    factory = factory,
+                    tokenId = tokenId,
+                    onBack = { navController.popBackStack() },
+                    onBuy = { token -> navController.navigate(Screen.Order.createRoute(AssetIds.bet(token), OrderSide.BUY.name)) }
                 )
             }
             composable(Screen.Funds.route) {

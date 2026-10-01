@@ -3,6 +3,7 @@ package com.papertrader.app.ui.screens.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papertrader.app.data.repository.MarketRepository
+import com.papertrader.app.domain.model.BetMarket
 import com.papertrader.app.domain.model.Coin
 import com.papertrader.app.util.NetworkResult
 import kotlinx.coroutines.Job
@@ -20,6 +21,7 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val crypto: List<Coin> = emptyList(),
     val stocks: List<Coin> = emptyList(),
+    val bets: List<BetMarket> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -36,7 +38,7 @@ class SearchViewModel(private val marketRepository: MarketRepository) : ViewMode
         _uiState.update { it.copy(query = query) }
         searchJob?.cancel()
         if (query.isBlank()) {
-            _uiState.update { it.copy(crypto = emptyList(), stocks = emptyList(), isLoading = false, errorMessage = null) }
+            _uiState.update { it.copy(crypto = emptyList(), stocks = emptyList(), bets = emptyList(), isLoading = false, errorMessage = null) }
             return
         }
         searchJob = viewModelScope.launch {
@@ -45,14 +47,17 @@ class SearchViewModel(private val marketRepository: MarketRepository) : ViewMode
             coroutineScope {
                 val cryptoDeferred = async { marketRepository.searchCoins(query) }
                 val stocksDeferred = async { marketRepository.searchStocks(query) }
+                val betsDeferred = async { marketRepository.searchBets(query) }
                 val crypto = cryptoDeferred.await()
                 val stocks = stocksDeferred.await()
+                val bets = betsDeferred.await()
                 val bothFailed = crypto is NetworkResult.Error && stocks is NetworkResult.Error
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         crypto = crypto.dataOrEmpty(),
                         stocks = stocks.dataOrEmpty(),
+                        bets = bets.betsOrEmpty(),
                         errorMessage = if (bothFailed && crypto is NetworkResult.Error) crypto.message else null
                     )
                 }
@@ -61,5 +66,8 @@ class SearchViewModel(private val marketRepository: MarketRepository) : ViewMode
     }
 
     private fun NetworkResult<List<Coin>>.dataOrEmpty(): List<Coin> =
+        if (this is NetworkResult.Success) data else emptyList()
+
+    private fun NetworkResult<List<BetMarket>>.betsOrEmpty(): List<BetMarket> =
         if (this is NetworkResult.Success) data else emptyList()
 }

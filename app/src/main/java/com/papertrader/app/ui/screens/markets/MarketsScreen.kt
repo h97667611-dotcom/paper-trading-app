@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +47,8 @@ import com.papertrader.app.ui.theme.LossRed
 import com.papertrader.app.ui.theme.ProfitGreen
 import com.papertrader.app.ui.theme.TextSecondary
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
+
+private val DEX_CHAINS = listOf("Solana" to "solana", "Ethereum" to "ethereum", "Base" to "base", "BNB" to "bnb")
 
 @Composable
 fun MarketsScreen(
@@ -72,7 +76,7 @@ fun MarketsScreen(
             }
         }
         TextTabs(
-            labels = listOf("Crypto", "Stocks", "Bets", "Sports", "Casino", "DEX"),
+            labels = listOf("Crypto", "Stocks", "Bets", "Sports", "Casino"),
             selected = state.selectedTab.ordinal,
             onSelect = { viewModel.selectTab(MarketsTab.values()[it]) },
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
@@ -84,19 +88,18 @@ fun MarketsScreen(
             label = "marketsTab"
         ) { tab ->
             when (tab) {
-                MarketsTab.COINS -> CoinsTabContent(state, onAssetClick)
+                MarketsTab.COINS -> CoinsTabContent(state, onAssetClick, viewModel::selectDexQuery)
                 MarketsTab.STOCKS -> StocksTabContent(state, onAssetClick)
                 MarketsTab.BETS -> BetsTabContent(state, false, viewModel::selectBetCategory, onBetClick)
                 MarketsTab.SPORTS -> BetsTabContent(state, true, viewModel::selectBetCategory, onBetClick)
                 MarketsTab.CASINO -> CasinoTabContent(factory, onCasinoGame, onCasinoPlay)
-                MarketsTab.DEX_PAIRS -> DexPairsTabContent(state.dexPairs)
             }
         }
     }
 }
 
 @Composable
-private fun CoinsTabContent(state: MarketsUiState, onAssetClick: (String) -> Unit) {
+private fun CoinsTabContent(state: MarketsUiState, onAssetClick: (String) -> Unit, onDexQuery: (String) -> Unit) {
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -124,6 +127,17 @@ private fun CoinsTabContent(state: MarketsUiState, onAssetClick: (String) -> Uni
         items(state.topGainers, key = { "g_${it.id}" }) { coin -> CoinCard(coin = coin, onClick = { onAssetClick(coin.id) }) }
         item { SectionHeader("Top Losers") }
         items(state.topLosers, key = { "l_${it.id}" }) { coin -> CoinCard(coin = coin, onClick = { onAssetClick(coin.id) }) }
+        item { SectionHeader("On-chain (DexScreener)") }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(DEX_CHAINS, key = { it.second }) { (label, query) ->
+                    ChipPill(label, state.dexQuery == query, { onDexQuery(query) })
+                }
+            }
+        }
+        itemsIndexed(state.dexPairs.take(30), key = { index, pair -> "d_${index}_${pair.pairAddress}" }) { _, pair ->
+            DexPairRow(pair)
+        }
         item { SectionHeader("Popular Coins") }
         items(state.allCoins, key = { "a_${it.id}" }) { coin -> CoinCard(coin = coin, onClick = { onAssetClick(coin.id) }) }
     }
@@ -196,34 +210,38 @@ private fun BetsTabContent(
     }
 }
 
+/** A DexScreener pair inside the crypto tab. Tap to open it on DexScreener. */
 @Composable
-private fun DexPairsTabContent(pairs: List<DexPair>) {
-    LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+private fun DexPairRow(pair: DexPair) {
+    val uriHandler = LocalUriHandler.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .bounceClick { pair.url?.let { runCatching { uriHandler.openUri(it) } } }
+            .padding(vertical = 10.dp)
     ) {
-        items(pairs, key = { it.pairAddress }) { pair ->
-            Column(modifier = Modifier.fillMaxWidth().padding(2.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text("${pair.baseTokenSymbol}/${pair.quoteTokenSymbol}", style = MaterialTheme.typography.titleMedium)
-                        Text("${pair.chain} · ${pair.dexName}", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(formatUsd(pair.priceUsd), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            formatPercent(pair.priceChange24h),
-                            color = if (pair.priceChange24h >= 0) ProfitGreen else LossRed
-                        )
-                    }
-                }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Liquidity ${formatUsdCompact(pair.liquidityUsd)} · Vol 24h ${formatUsdCompact(pair.volume24h)}",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium
+                    "${pair.baseTokenSymbol}/${pair.quoteTokenSymbol}",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1
+                )
+                Text("${pair.chain} \u00B7 ${pair.dexName}", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(formatPriceSmart(pair.priceUsd), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    formatPercent(pair.priceChange24h),
+                    color = if (pair.priceChange24h >= 0) ProfitGreen else LossRed
                 )
             }
         }
+        Text(
+            "Liquidity ${formatUsdCompact(pair.liquidityUsd)} \u00B7 Vol 24h ${formatUsdCompact(pair.volume24h)}",
+            color = TextSecondary,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 

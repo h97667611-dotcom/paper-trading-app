@@ -10,7 +10,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import com.papertrader.app.ui.intro.IntroAnimation
 import com.papertrader.app.ui.navigation.PaperTraderNavHost
 import com.papertrader.app.ui.theme.PaperTraderTheme
 import com.papertrader.app.ui.viewmodel.ViewModelFactory
@@ -25,18 +24,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PaperTraderTheme {
-                var introDone by rememberSaveable { mutableStateOf(false) }
-                Crossfade(
-                    targetState = introDone,
-                    animationSpec = tween(350),
-                    label = "intro"
-                ) { done ->
-                    if (done) {
-                        PaperTraderNavHost(factory = viewModelFactory)
-                    } else {
-                        IntroAnimation(onFinished = { introDone = true })
-                    }
-                }
+                PaperTraderNavHost(factory = viewModelFactory)
             }
         }
     }

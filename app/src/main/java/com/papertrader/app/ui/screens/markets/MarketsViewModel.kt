@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class MarketsTab { COINS, STOCKS, BETS, SPORTS, CASINO, DEX_PAIRS }
+enum class MarketsTab { COINS, STOCKS, BETS, SPORTS, CASINO }
 
 data class MarketsUiState(
     val isLoading: Boolean = true,
@@ -31,6 +31,7 @@ data class MarketsUiState(
     val betsFor: BetCategory? = null,
     val isBetsLoading: Boolean = false,
     val betsError: String? = null,
+    val dexQuery: String = "solana",
     val dexPairs: List<DexPair> = emptyList(),
     val isFromCache: Boolean = false,
     val errorMessage: String? = null
@@ -123,9 +124,14 @@ class MarketsViewModel(private val marketRepository: MarketRepository) : ViewMod
         }
     }
 
+    fun selectDexQuery(query: String) {
+        _uiState.update { it.copy(dexQuery = query) }
+        loadDexPairs()
+    }
+
     private fun loadDexPairs() {
         viewModelScope.launch {
-            when (val result = marketRepository.getTrendingDexPairs()) {
+            when (val result = marketRepository.getTrendingDexPairs(_uiState.value.dexQuery)) {
                 is NetworkResult.Success -> _uiState.update { it.copy(dexPairs = result.data) }
                 is NetworkResult.Error -> { /* Dex pairs are supplementary; keep the rest usable. */ }
             }

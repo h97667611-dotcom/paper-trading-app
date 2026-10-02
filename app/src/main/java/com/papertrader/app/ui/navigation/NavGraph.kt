@@ -17,6 +17,8 @@ import androidx.navigation.navArgument
 import com.papertrader.app.domain.model.AssetIds
 import com.papertrader.app.domain.model.OrderSide
 import com.papertrader.app.ui.screens.bets.BetDetailScreen
+import com.papertrader.app.ui.screens.casino.ClassicGameScreen
+import com.papertrader.app.ui.screens.casino.SlotPlayerScreen
 import com.papertrader.app.ui.screens.coindetail.CoinDetailScreen
 import com.papertrader.app.ui.screens.dashboard.DashboardScreen
 import com.papertrader.app.ui.screens.funds.FundsScreen
@@ -73,7 +75,9 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                     factory = factory,
                     onAssetClick = { id -> navController.navigate(Screen.CoinDetail.createRoute(id)) },
                     onSearchClick = { openSearch() },
-                    onBetClick = { token -> navController.navigate(Screen.BetDetail.createRoute(token)) }
+                    onBetClick = { token -> navController.navigate(Screen.BetDetail.createRoute(token)) },
+                    onCasinoGame = { game -> navController.navigate(Screen.CasinoGame.createRoute(game)) },
+                    onCasinoPlay = { navController.navigate(Screen.CasinoPlay.route) }
                 )
             }
             composable(Screen.Search.route) {
@@ -139,6 +143,19 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                     onBack = { navController.popBackStack() },
                     onBuy = { token -> navController.navigate(Screen.Order.createRoute(AssetIds.bet(token), OrderSide.BUY.name)) }
                 )
+            }
+            composable(
+                route = Screen.CasinoGame.route,
+                arguments = listOf(navArgument("game") { type = NavType.StringType })
+            ) { backStackEntry ->
+                ClassicGameScreen(
+                    factory = factory,
+                    game = backStackEntry.arguments?.getString("game").orEmpty(),
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.CasinoPlay.route) {
+                SlotPlayerScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.Funds.route) {
                 FundsScreen(factory, onBack = { navController.popBackStack() })

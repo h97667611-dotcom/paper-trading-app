@@ -1,6 +1,7 @@
 package com.papertrader.app.di
 
 import android.content.Context
+import com.papertrader.app.data.casino.CasinoStore
 import com.papertrader.app.data.local.AppDatabase
 import com.papertrader.app.data.repository.MarketRepository
 import com.papertrader.app.data.repository.PaperTradingRepository
@@ -16,6 +17,8 @@ class AppContainer(context: Context) {
     private val database: AppDatabase = AppDatabase.getInstance(context)
 
     val paperTradingEngine: PaperTradingEngine by lazy { PaperTradingEngine() }
+
+    val casinoStore: CasinoStore by lazy { CasinoStore(context.applicationContext) }
 
     val marketRepository: MarketRepository by lazy {
         MarketRepository(

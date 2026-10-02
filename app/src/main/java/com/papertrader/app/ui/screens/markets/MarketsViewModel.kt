@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class MarketsTab { COINS, STOCKS, BETS, SPORTS, DEX_PAIRS }
+enum class MarketsTab { COINS, STOCKS, BETS, SPORTS, CASINO, DEX_PAIRS }
 
 data class MarketsUiState(
     val isLoading: Boolean = true,

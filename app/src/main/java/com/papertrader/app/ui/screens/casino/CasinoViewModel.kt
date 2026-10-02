@@ -3,10 +3,8 @@ package com.papertrader.app.ui.screens.casino
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papertrader.app.data.casino.CasinoStore
-import com.papertrader.app.data.casino.SlotGame
-import com.papertrader.app.data.casino.SlotProvider
-import com.papertrader.app.data.casino.SlotsLaunchClient
-import com.papertrader.app.data.remote.multi.HttpStatusException
+import com.papertrader.app.data.casino.Hub88Client
+import com.papertrader.app.data.casino.Hub88Game
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,114 +12,108 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
 
-/** The slot the player screen should open (set right before navigating). */
+/** The game the player screen should open (set right before navigating). */
 object CasinoSession {
     @Volatile var title: String = ""
-    @Volatile var url: String = ""
-    @Volatile var host: String = ""
+    @Volatile var gameCode: String = ""
+    @Volatile var baseUrl: String = ""
+    @Volatile var operatorId: Long = 0L
+    @Volatile var privateKey: String = ""
 }
 
 data class CasinoUiState(
     val chips: Long = CasinoStore.STARTING_CHIPS,
-    val token: String = "",
-    val host: String = "",
-    val providers: List<SlotProvider> = emptyList(),
-    val selectedProvider: String? = null,
-    val games: List<SlotGame> = emptyList(),
-    val page: Int = 0,
-    val lastPage: Int = 0,
+    val baseUrl: String = "",
+    val operatorId: String = "",
+    val hasKey: Boolean = false,
+    val games: List<Hub88Game> = emptyList(),
+    val category: String? = null,
+    val search: String = "",
+    val visibleCount: Int = 40,
     val isLoading: Boolean = false,
     val error: String? = null
-)
+) {
+    val connected: Boolean get() = baseUrl.isNotBlank() && operatorId.isNotBlank() && hasKey
+}
 
 class CasinoViewModel(private val store: CasinoStore) : ViewModel() {
 
     private val _state = MutableStateFlow(
-        CasinoUiState(chips = store.chips, token = store.slotsToken, host = store.slotsHost)
+        CasinoUiState(
+            chips = store.chips,
+            baseUrl = store.hubBaseUrl,
+            operatorId = store.hubOperatorId,
+            hasKey = store.hubPrivateKey.isNotBlank()
+        )
     )
     val uiState: StateFlow<CasinoUiState> = _state.asStateFlow()
-    private var pageJob: Job? = null
+    private var loadJob: Job? = null
 
     init {
-        if (store.slotsToken.isNotBlank()) {
-            loadProviders()
-            loadPage(reset = true)
-        }
+        if (_state.value.connected) loadGames()
     }
 
-    fun saveCredentials(token: String, host: String) {
-        store.slotsToken = token.trim()
-        store.slotsHost = host.trim()
+    fun saveCredentials(baseUrl: String, operatorId: String, privateKey: String) {
+        store.hubBaseUrl = baseUrl.trim()
+        store.hubOperatorId = operatorId.trim()
+        store.hubPrivateKey = privateKey.trim()
         _state.update {
             it.copy(
-                token = token.trim(), host = host.trim(), providers = emptyList(), selectedProvider = null,
-                games = emptyList(), page = 0, lastPage = 0, error = null
+                baseUrl = baseUrl.trim(), operatorId = operatorId.trim(), hasKey = privateKey.isNotBlank(),
+                games = emptyList(), category = null, search = "", visibleCount = 40, error = null
             )
         }
-        loadProviders()
-        loadPage(reset = true)
+        loadGames()
     }
 
     fun clearCredentials() {
-        store.slotsToken = ""
-        store.slotsHost = ""
+        store.hubBaseUrl = ""
+        store.hubOperatorId = ""
+        store.hubPrivateKey = ""
         _state.update {
-            it.copy(
-                token = "", host = "", providers = emptyList(), selectedProvider = null,
-                games = emptyList(), page = 0, lastPage = 0, error = null
-            )
+            it.copy(baseUrl = "", operatorId = "", hasKey = false, games = emptyList(), category = null, search = "", error = null)
         }
     }
 
-    fun selectProvider(id: String?) {
-        _state.update { it.copy(selectedProvider = id, games = emptyList(), page = 0, lastPage = 0) }
-        loadPage(reset = true)
+    fun reload() = loadGames()
+
+    fun selectCategory(category: String?) {
+        _state.update { it.copy(category = category, visibleCount = 40) }
     }
 
-    fun loadMore() {
-        val s = _state.value
-        if (!s.isLoading && s.page < s.lastPage) loadPage(reset = false)
+    fun setSearch(text: String) {
+        _state.update { it.copy(search = text, visibleCount = 40) }
     }
 
-    fun openGame(game: SlotGame) {
+    fun showMore() {
+        _state.update { it.copy(visibleCount = it.visibleCount + 40) }
+    }
+
+    fun openGame(game: Hub88Game) {
         CasinoSession.title = game.name
-        CasinoSession.url = game.url
-        CasinoSession.host = _state.value.host
+        CasinoSession.gameCode = game.code
+        CasinoSession.baseUrl = store.hubBaseUrl
+        CasinoSession.operatorId = store.hubOperatorId.toLongOrNull() ?: 0L
+        CasinoSession.privateKey = store.hubPrivateKey
     }
 
-    private fun loadPage(reset: Boolean) {
-        pageJob?.cancel()
-        pageJob = viewModelScope.launch {
+    private fun loadGames() {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            val s = _state.value
-            val next = if (reset) 1 else s.page + 1
-            try {
-                val page = SlotsLaunchClient.games(s.token, s.host, next, s.selectedProvider)
-                _state.update {
-                    it.copy(
-                        games = if (reset) page.games else it.games + page.games,
-                        page = page.page, lastPage = page.lastPage, isLoading = false
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = friendly(e)) }
+            val operatorId = store.hubOperatorId.toLongOrNull()
+            if (operatorId == null) {
+                _state.update { it.copy(isLoading = false, error = "The operator ID must be a number.") }
+                return@launch
             }
-        }
-    }
-
-    private fun loadProviders() {
-        viewModelScope.launch {
             try {
-                val list = SlotsLaunchClient.providers(_state.value.token, _state.value.host)
-                _state.update { it.copy(providers = list) }
+                val games = Hub88Client.demoGames(store.hubBaseUrl, operatorId, store.hubPrivateKey)
+                _state.update { it.copy(games = games, isLoading = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // The game list shows the error; providers are only a filter.
+                _state.update { it.copy(isLoading = false, error = Hub88Client.describeError(e)) }
             }
         }
     }
@@ -141,14 +133,5 @@ class CasinoViewModel(private val store: CasinoStore) : ViewModel() {
     fun resetChips() {
         store.chips = CasinoStore.STARTING_CHIPS
         _state.update { it.copy(chips = CasinoStore.STARTING_CHIPS) }
-    }
-
-    private fun friendly(e: Exception): String = when {
-        e is HttpStatusException && (e.code == 401 || e.code == 403) ->
-            "SlotsLaunch rejected the token or origin host (HTTP ${e.code}). Check both."
-        e is HttpStatusException && e.code == 429 -> "Rate limit reached. Try again in a minute."
-        e is HttpStatusException -> "SlotsLaunch answered with HTTP ${e.code}."
-        e is IOException -> "No connection."
-        else -> "Could not read the SlotsLaunch response."
     }
 }

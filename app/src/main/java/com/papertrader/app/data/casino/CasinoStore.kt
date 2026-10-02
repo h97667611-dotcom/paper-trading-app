@@ -4,7 +4,7 @@ import android.content.Context
 
 /**
  * Local storage for the casino tab: the play-chip balance (not real money, not connected to the
- * trading account) and the optional SlotsLaunch credentials. Everything stays on this phone.
+ * trading account) and the optional Hub88 operator credentials. Everything stays on this phone.
  */
 class CasinoStore(context: Context) {
     private val prefs = context.getSharedPreferences("ghost_casino", Context.MODE_PRIVATE)
@@ -15,16 +15,22 @@ class CasinoStore(context: Context) {
             prefs.edit().putLong("chips", value).apply()
         }
 
-    var slotsToken: String
-        get() = prefs.getString("slots_token", "").orEmpty()
+    var hubBaseUrl: String
+        get() = prefs.getString("hub_base_url", "").orEmpty()
         set(value) {
-            prefs.edit().putString("slots_token", value).apply()
+            prefs.edit().putString("hub_base_url", value).apply()
         }
 
-    var slotsHost: String
-        get() = prefs.getString("slots_host", "").orEmpty()
+    var hubOperatorId: String
+        get() = prefs.getString("hub_operator_id", "").orEmpty()
         set(value) {
-            prefs.edit().putString("slots_host", value).apply()
+            prefs.edit().putString("hub_operator_id", value).apply()
+        }
+
+    var hubPrivateKey: String
+        get() = prefs.getString("hub_private_key", "").orEmpty()
+        set(value) {
+            prefs.edit().putString("hub_private_key", value).apply()
         }
 
     companion object {

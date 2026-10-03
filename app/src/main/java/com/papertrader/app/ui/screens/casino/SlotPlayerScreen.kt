@@ -31,15 +31,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.papertrader.app.data.casino.Hub88Client
+import com.papertrader.app.data.casino.ScriptCasinoClient
 import com.papertrader.app.ui.theme.LossRed
 import kotlinx.coroutines.CancellationException
 
 private const val LOBBY_URL = "https://ghosttrade.invalid/lobby"
 
 /**
- * Opens one Hub88 game in DEMO mode: asks Hub88 for the launch URL (signed request) and loads it.
- * The game's "home" button is sent to a placeholder lobby URL, which closes this screen.
+ * Opens one catalog game in DEMO mode: asks the API for the launch URL (signed request) and loads it.
+ * The game's "back to lobby" link points to a placeholder URL, which closes this screen.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -49,17 +49,17 @@ fun SlotPlayerScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) {
         try {
-            url = Hub88Client.demoUrl(
+            url = ScriptCasinoClient.demoUrl(
                 baseUrl = CasinoSession.baseUrl,
-                operatorId = CasinoSession.operatorId,
-                privateKey = CasinoSession.privateKey,
-                gameCode = CasinoSession.gameCode,
-                lobbyUrl = LOBBY_URL
+                merchantId = CasinoSession.merchantId,
+                secret = CasinoSession.secret,
+                gameUuid = CasinoSession.gameUuid,
+                returnUrl = LOBBY_URL
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error = Hub88Client.describeError(e)
+            error = ScriptCasinoClient.describeError(e)
         }
     }
 

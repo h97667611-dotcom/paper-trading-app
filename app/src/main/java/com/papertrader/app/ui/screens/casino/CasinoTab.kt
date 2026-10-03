@@ -41,7 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.papertrader.app.data.casino.Hub88Game
+import com.papertrader.app.data.casino.CasinoGame
+import com.papertrader.app.data.casino.CasinoStore
 import com.papertrader.app.ui.components.ChipPill
 import com.papertrader.app.ui.components.SectionHeader
 import com.papertrader.app.ui.components.bounceClick
@@ -58,22 +59,22 @@ private val CLASSIC_GAMES = listOf(
     Triple("coinflip", "Coin flip", "\uD83E\uDE99")
 )
 
-/** The "Casino" tab: built-in play-chip games plus the Hub88 demo game catalog. */
+/** The "Casino" tab: built-in play-chip games plus the Script.Casino demo game catalog. */
 @Composable
 fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlaySlot: () -> Unit) {
     val vm: CasinoViewModel = viewModel(factory = factory)
     LaunchedEffect(Unit) { vm.refreshChips() }
     val state by vm.uiState.collectAsState()
-    var urlInput by rememberSaveable { mutableStateOf("") }
+    var urlInput by rememberSaveable { mutableStateOf(CasinoStore.DEFAULT_BASE_URL) }
     var idInput by rememberSaveable { mutableStateOf("") }
-    var keyInput by rememberSaveable { mutableStateOf("") }
+    var secretInput by rememberSaveable { mutableStateOf("") }
 
     val filtered = remember(state.games, state.category, state.search) {
         state.games.filter { game ->
             (state.category == null || game.category == state.category) &&
                 (state.search.isBlank() ||
                     game.name.contains(state.search, ignoreCase = true) ||
-                    game.product.contains(state.search, ignoreCase = true))
+                    game.provider.contains(state.search, ignoreCase = true))
         }
     }
     val categories = remember(state.games) {
@@ -124,7 +125,7 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
             }
         }
 
-        item { SectionHeader("Demo slots and games (Hub88)") }
+        item { SectionHeader("Demo slots and games (Script.Casino)") }
 
         if (!state.connected) {
             item {
@@ -135,12 +136,12 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
                         .background(SurfaceCard)
                         .padding(18.dp)
                 ) {
-                    Text("Connect your Hub88 operator account", fontWeight = FontWeight.SemiBold)
+                    Text("Connect your merchant account", fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Hub88 is a B2B game provider. You need an operator account, your operator ID, " +
-                            "the API URL of your region and your private key (PKCS#8 PEM). " +
-                            "Demo mode only, no real money. The key is stored only on this phone: never share it.",
+                        "This is a B2B games API: you need a merchant ID and secret key from the provider. " +
+                            "Only the catalog and demo mode are used, no real money. " +
+                            "Both are stored only on this phone: never share your secret.",
                         color = TextSecondary,
                         fontSize = 13.sp
                     )
@@ -148,7 +149,7 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
                     OutlinedTextField(
                         value = urlInput,
                         onValueChange = { urlInput = it },
-                        label = { Text("API base URL of your region") },
+                        label = { Text("API base URL") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                         modifier = Modifier.fillMaxWidth()
@@ -156,28 +157,28 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = idInput,
-                        onValueChange = { idInput = it.filter { c -> c.isDigit() } },
-                        label = { Text("Operator ID") },
+                        onValueChange = { idInput = it.trim() },
+                        label = { Text("Merchant ID") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = keyInput,
-                        onValueChange = { keyInput = it },
-                        label = { Text("Private key (PEM)") },
-                        maxLines = 3,
+                        value = secretInput,
+                        onValueChange = { secretInput = it.trim() },
+                        label = { Text("Secret key") },
+                        singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = {
-                            vm.saveCredentials(urlInput, idInput, keyInput)
-                            keyInput = ""
+                            vm.saveCredentials(urlInput, idInput, secretInput)
+                            secretInput = ""
                         },
-                        enabled = urlInput.isNotBlank() && idInput.isNotBlank() && keyInput.isNotBlank(),
+                        enabled = urlInput.isNotBlank() && idInput.isNotBlank() && secretInput.isNotBlank(),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
@@ -205,11 +206,9 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
                 }
             }
             if (state.games.isNotEmpty()) {
-                item {
-                    Text("${filtered.size} demo games", color = TextSecondary, fontSize = 12.sp)
-                }
+                item { Text("${filtered.size} games loaded", color = TextSecondary, fontSize = 12.sp) }
             }
-            items(filtered.take(state.visibleCount).chunked(2), key = { "g_${it.first().code}" }) { pair ->
+            items(filtered.take(state.visibleCount).chunked(2), key = { "g_${it.first().uuid}" }) { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     pair.forEach { game ->
                         GameTile(game, Modifier.weight(1f)) {
@@ -230,8 +229,12 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
             state.error?.let { message ->
                 item { Text(message, color = LossRed, fontSize = 13.sp) }
             }
-            if (filtered.size > state.visibleCount) {
-                item { ChipPill("Show more", false, { vm.showMore() }) }
+            if (!state.isLoading) {
+                if (filtered.size > state.visibleCount) {
+                    item { ChipPill("Show more", false, { vm.showMore() }) }
+                } else if (state.hasMore) {
+                    item { ChipPill("Load more games", false, { vm.loadMore() }) }
+                }
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,7 +256,7 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
 }
 
 @Composable
-private fun GameTile(game: Hub88Game, modifier: Modifier, onClick: () -> Unit) {
+private fun GameTile(game: CasinoGame, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
             .bounceClick(onClick)
@@ -272,7 +275,7 @@ private fun GameTile(game: Hub88Game, modifier: Modifier, onClick: () -> Unit) {
         Column(modifier = Modifier.padding(10.dp)) {
             Text(game.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                listOf(game.product, game.category).filter { it.isNotBlank() }.joinToString(" \u00B7 "),
+                listOf(game.provider, game.category).filter { it.isNotBlank() }.joinToString(" \u00B7 "),
                 color = TextSecondary,
                 fontSize = 11.sp,
                 maxLines = 1,

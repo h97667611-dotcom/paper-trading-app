@@ -13,6 +13,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,6 +60,8 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onSlot
     LaunchedEffect(Unit) { vm.refreshChips() }
     val state by vm.uiState.collectAsState()
     var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var limitInput by rememberSaveable { mutableStateOf("") }
     val categories = remember { DemoSlots.all.map { it.category }.distinct().sorted() }
     val slots = remember(category) { DemoSlots.all.filter { category == null || it.category == category } }
 
@@ -62,21 +70,58 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onSlot
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(SurfaceCard)
-                    .padding(18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(18.dp)
             ) {
-                Column {
-                    Text("Play chips", color = TextSecondary, fontSize = 13.sp)
-                    Text("%,d".format(state.chips), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text("Not real money. Separate from your trading account.", color = TextSecondary, fontSize = 11.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Play chips", color = TextSecondary, fontSize = 13.sp)
+                        Text("%,d".format(state.chips), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ChipPill("Set limit", editing, {
+                            editing = !editing
+                            limitInput = state.startChips.toString()
+                        })
+                        ChipPill("Reset", false, { vm.resetChips() })
+                    }
                 }
-                ChipPill("Reset", false, { vm.resetChips() })
+                if (editing) {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = limitInput,
+                        onValueChange = { limitInput = it.filter { c -> c.isDigit() }.take(9) },
+                        label = { Text("Your chip limit (1 to 10,000,000)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            vm.setChips(limitInput.toLongOrNull() ?: 0L)
+                            editing = false
+                        },
+                        enabled = (limitInput.toLongOrNull() ?: 0L) >= 1L,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                        modifier = Modifier.fillMaxWidth().height(46.dp)
+                    ) { Text("Set chips", fontWeight = FontWeight.Bold) }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Not real money. Separate from your trading account. Reset refills to your limit (${"%,d".format(state.startChips)}).",
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
             }
         }
 

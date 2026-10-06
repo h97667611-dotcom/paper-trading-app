@@ -15,7 +15,15 @@ class CasinoStore(context: Context) {
             prefs.edit().putLong("chips", value).apply()
         }
 
+    /** The chip limit the player chose: used as the balance when chips are refilled or reset. */
+    var startChips: Long
+        get() = prefs.getLong("start_chips", STARTING_CHIPS)
+        set(value) {
+            prefs.edit().putLong("start_chips", value).apply()
+        }
+
     companion object {
         const val STARTING_CHIPS = 1_000L
+        const val MAX_CHIPS = 10_000_000L
     }
 }

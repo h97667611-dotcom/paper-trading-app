@@ -186,7 +186,7 @@ fun SlotMachineScreen(factory: ViewModelFactory, slotId: String, onBack: () -> U
                 Spacer(Modifier.height(12.dp))
                 Text("You are out of chips.", color = LossRed)
                 Spacer(Modifier.height(8.dp))
-                ChipPill("Get 1,000 new chips", false, { vm.resetChips() })
+                ChipPill("Refill chips", false, { vm.resetChips() })
             }
             Spacer(Modifier.height(16.dp))
             Text(

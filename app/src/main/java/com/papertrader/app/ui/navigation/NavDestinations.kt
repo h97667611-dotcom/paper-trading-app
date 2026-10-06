@@ -28,7 +28,9 @@ sealed class Screen(val route: String) {
     data object CasinoGame : Screen("casino_game/{game}") {
         fun createRoute(game: String) = "casino_game/$game"
     }
-    data object CasinoPlay : Screen("casino_play")
+    data object CasinoSlot : Screen("casino_slot/{id}") {
+        fun createRoute(id: String) = "casino_slot/$id"
+    }
 }
 
 data class BottomNavItem(

@@ -1,0 +1,13 @@
+{
+  "name": "demo-slot-api",
+  "version": "1.0.0",
+  "description": "DEMO ONLY slot machine API: 20 fictional slots and simulated spins. No real money, no payments, no API key.",
+  "main": "server.js",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}

@@ -57,7 +57,7 @@ fun MarketsScreen(
     onSearchClick: () -> Unit,
     onBetClick: (String) -> Unit,
     onCasinoGame: (String) -> Unit,
-    onCasinoPlay: () -> Unit
+    onCasinoSlot: (String) -> Unit
 ) {
     val viewModel: MarketsViewModel = viewModel(factory = factory)
     val state by viewModel.uiState.collectAsState()
@@ -92,7 +92,7 @@ fun MarketsScreen(
                 MarketsTab.STOCKS -> StocksTabContent(state, onAssetClick)
                 MarketsTab.BETS -> BetsTabContent(state, false, viewModel::selectBetCategory, onBetClick)
                 MarketsTab.SPORTS -> BetsTabContent(state, true, viewModel::selectBetCategory, onBetClick)
-                MarketsTab.CASINO -> CasinoTabContent(factory, onCasinoGame, onCasinoPlay)
+                MarketsTab.CASINO -> CasinoTabContent(factory, onCasinoGame, onCasinoSlot)
             }
         }
     }

@@ -2,7 +2,6 @@ package com.papertrader.app.ui.screens.casino
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,11 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,22 +25,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import com.papertrader.app.data.casino.CasinoGame
-import com.papertrader.app.data.casino.CasinoStore
+import com.papertrader.app.data.casino.DemoSlot
+import com.papertrader.app.data.casino.DemoSlots
 import com.papertrader.app.ui.components.ChipPill
 import com.papertrader.app.ui.components.SectionHeader
 import com.papertrader.app.ui.components.bounceClick
-import com.papertrader.app.ui.theme.LossRed
 import com.papertrader.app.ui.theme.SurfaceCard
 import com.papertrader.app.ui.theme.SurfaceCardElevated
 import com.papertrader.app.ui.theme.TextSecondary
@@ -59,27 +47,15 @@ private val CLASSIC_GAMES = listOf(
     Triple("coinflip", "Coin flip", "\uD83E\uDE99")
 )
 
-/** The "Casino" tab: built-in play-chip games plus the Script.Casino demo game catalog. */
+/** The "Casino" tab: classic chip games plus 20 fictional demo slots. Play chips only. */
 @Composable
-fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlaySlot: () -> Unit) {
+fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onSlot: (String) -> Unit) {
     val vm: CasinoViewModel = viewModel(factory = factory)
     LaunchedEffect(Unit) { vm.refreshChips() }
     val state by vm.uiState.collectAsState()
-    var urlInput by rememberSaveable { mutableStateOf(CasinoStore.DEFAULT_BASE_URL) }
-    var idInput by rememberSaveable { mutableStateOf("") }
-    var secretInput by rememberSaveable { mutableStateOf("") }
-
-    val filtered = remember(state.games, state.category, state.search) {
-        state.games.filter { game ->
-            (state.category == null || game.category == state.category) &&
-                (state.search.isBlank() ||
-                    game.name.contains(state.search, ignoreCase = true) ||
-                    game.provider.contains(state.search, ignoreCase = true))
-        }
-    }
-    val categories = remember(state.games) {
-        state.games.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
-    }
+    var category by rememberSaveable { mutableStateOf<String?>(null) }
+    val categories = remember { DemoSlots.all.map { it.category }.distinct().sorted() }
+    val slots = remember(category) { DemoSlots.all.filter { category == null || it.category == category } }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
@@ -125,122 +101,28 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
             }
         }
 
-        item { SectionHeader("Demo slots and games (Script.Casino)") }
-
-        if (!state.connected) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SurfaceCard)
-                        .padding(18.dp)
-                ) {
-                    Text("Connect your merchant account", fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "This is a B2B games API: you need a merchant ID and secret key from the provider. " +
-                            "Only the catalog and demo mode are used, no real money. " +
-                            "Both are stored only on this phone: never share your secret.",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = urlInput,
-                        onValueChange = { urlInput = it },
-                        label = { Text("API base URL") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = idInput,
-                        onValueChange = { idInput = it.trim() },
-                        label = { Text("Merchant ID") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = secretInput,
-                        onValueChange = { secretInput = it.trim() },
-                        label = { Text("Secret key") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            vm.saveCredentials(urlInput, idInput, secretInput)
-                            secretInput = ""
-                        },
-                        enabled = urlInput.isNotBlank() && idInput.isNotBlank() && secretInput.isNotBlank(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
-                    ) { Text("Connect", fontWeight = FontWeight.Bold) }
+        item { SectionHeader("Demo slots") }
+        item {
+            Text(
+                "${DemoSlots.all.size} fictional slots with different themes and mechanics. Demo only, no real money.",
+                color = TextSecondary,
+                fontSize = 13.sp
+            )
+        }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { ChipPill("All", category == null, { category = null }) }
+                items(categories, key = { "c_$it" }) { name ->
+                    ChipPill(name, category == name, { category = name })
                 }
             }
-        } else {
-            item {
-                OutlinedTextField(
-                    value = state.search,
-                    onValueChange = { vm.setSearch(it) },
-                    label = { Text("Search games or providers") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            if (categories.isNotEmpty()) {
-                item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { ChipPill("All", state.category == null, { vm.selectCategory(null) }) }
-                        items(categories, key = { "c_$it" }) { category ->
-                            ChipPill(category, state.category == category, { vm.selectCategory(category) })
-                        }
-                    }
+        }
+        items(slots.chunked(2), key = { "s_${it.first().id}" }) { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                pair.forEach { slot ->
+                    SlotTile(slot, Modifier.weight(1f)) { onSlot(slot.id) }
                 }
-            }
-            if (state.games.isNotEmpty()) {
-                item { Text("${filtered.size} games loaded", color = TextSecondary, fontSize = 12.sp) }
-            }
-            items(filtered.take(state.visibleCount).chunked(2), key = { "g_${it.first().uuid}" }) { pair ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    pair.forEach { game ->
-                        GameTile(game, Modifier.weight(1f)) {
-                            vm.openGame(game)
-                            onPlaySlot()
-                        }
-                    }
-                    if (pair.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-            if (state.isLoading) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-            }
-            state.error?.let { message ->
-                item { Text(message, color = LossRed, fontSize = 13.sp) }
-            }
-            if (!state.isLoading) {
-                if (filtered.size > state.visibleCount) {
-                    item { ChipPill("Show more", false, { vm.showMore() }) }
-                } else if (state.hasMore) {
-                    item { ChipPill("Load more games", false, { vm.loadMore() }) }
-                }
-            }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ChipPill("Reload", false, { vm.reload() })
-                    ChipPill("Disconnect", false, { vm.clearCredentials() })
-                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
 
@@ -256,31 +138,23 @@ fun CasinoTabContent(factory: ViewModelFactory, onGame: (String) -> Unit, onPlay
 }
 
 @Composable
-private fun GameTile(game: CasinoGame, modifier: Modifier, onClick: () -> Unit) {
+private fun SlotTile(slot: DemoSlot, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier = modifier
             .bounceClick(onClick)
             .clip(RoundedCornerShape(18.dp))
             .background(SurfaceCard)
+            .padding(14.dp)
     ) {
-        AsyncImage(
-            model = game.thumb,
-            contentDescription = game.name,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp)
-                .background(SurfaceCardElevated)
+        Text(slot.icon, fontSize = 34.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(slot.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            "${slot.category} \u00B7 ${slot.reels}x${slot.rows} ${slot.mechanic}",
+            color = TextSecondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(game.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                listOf(game.provider, game.category).filter { it.isNotBlank() }.joinToString(" \u00B7 "),
-                color = TextSecondary,
-                fontSize = 11.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
 }

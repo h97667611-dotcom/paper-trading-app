@@ -18,7 +18,7 @@ import com.papertrader.app.domain.model.AssetIds
 import com.papertrader.app.domain.model.OrderSide
 import com.papertrader.app.ui.screens.bets.BetDetailScreen
 import com.papertrader.app.ui.screens.casino.ClassicGameScreen
-import com.papertrader.app.ui.screens.casino.SlotPlayerScreen
+import com.papertrader.app.ui.screens.casino.SlotMachineScreen
 import com.papertrader.app.ui.screens.coindetail.CoinDetailScreen
 import com.papertrader.app.ui.screens.dashboard.DashboardScreen
 import com.papertrader.app.ui.screens.funds.FundsScreen
@@ -77,7 +77,7 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                     onSearchClick = { openSearch() },
                     onBetClick = { token -> navController.navigate(Screen.BetDetail.createRoute(token)) },
                     onCasinoGame = { game -> navController.navigate(Screen.CasinoGame.createRoute(game)) },
-                    onCasinoPlay = { navController.navigate(Screen.CasinoPlay.route) }
+                    onCasinoSlot = { id -> navController.navigate(Screen.CasinoSlot.createRoute(id)) }
                 )
             }
             composable(Screen.Search.route) {
@@ -154,8 +154,15 @@ fun PaperTraderNavHost(factory: ViewModelFactory) {
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(Screen.CasinoPlay.route) {
-                SlotPlayerScreen(onBack = { navController.popBackStack() })
+            composable(
+                route = Screen.CasinoSlot.route,
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { backStackEntry ->
+                SlotMachineScreen(
+                    factory = factory,
+                    slotId = backStackEntry.arguments?.getString("id").orEmpty(),
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Funds.route) {
                 FundsScreen(factory, onBack = { navController.popBackStack() })
